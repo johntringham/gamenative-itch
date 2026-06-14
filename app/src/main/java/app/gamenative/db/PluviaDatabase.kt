@@ -23,6 +23,7 @@ import app.gamenative.data.ModOverwriteManifest
 import app.gamenative.data.ModPlacementRecipe
 import app.gamenative.data.ModProfile
 import app.gamenative.data.ModProfileInstallState
+import app.gamenative.data.ItchGame
 import app.gamenative.db.converters.AppConverter
 import app.gamenative.db.converters.ByteArrayConverter
 import app.gamenative.db.converters.FriendConverter
@@ -44,6 +45,7 @@ import app.gamenative.db.dao.SteamUnlockedBranchDao
 import app.gamenative.db.dao.GOGGameDao
 import app.gamenative.db.dao.EpicGameDao
 import app.gamenative.db.dao.AmazonGameDao
+import app.gamenative.db.dao.ItchGameDao
 
 const val DATABASE_NAME = "pluvia.db"
 
@@ -61,6 +63,7 @@ const val DATABASE_NAME = "pluvia.db"
         GOGGame::class,
         EpicGame::class,
         AmazonGame::class,
+        ItchGame::class,
         DownloadingAppInfo::class,
         SteamUnlockedBranch::class,
         ModInstall::class,
@@ -130,9 +133,13 @@ abstract class PluviaDatabase : RoomDatabase() {
 
     abstract fun amazonGameDao(): AmazonGameDao
 
+    abstract fun itchGameDao(): ItchGameDao
+
     abstract fun downloadingAppInfoDao(): DownloadingAppInfoDao
 
     abstract fun steamUnlockedBranchDao(): SteamUnlockedBranchDao
 
     abstract fun modDao(): ModDao
 }
+
+

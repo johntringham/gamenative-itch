@@ -240,6 +240,12 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+		<service
+            android:name=".service.itch.ItchService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+        
         <service
             android:name=".service.SupportReplyWatchService"
             android:enabled="true"

@@ -8,6 +8,7 @@ import app.gamenative.data.GameSource
 import app.gamenative.db.dao.AmazonGameDao
 import app.gamenative.db.dao.EpicGameDao
 import app.gamenative.db.dao.GOGGameDao
+import app.gamenative.db.dao.ItchGameDao
 import app.gamenative.db.dao.SteamAppDao
 import app.gamenative.events.AndroidEvent
 import app.gamenative.service.SteamService
@@ -47,6 +48,7 @@ object FrontendSyncManager {
         fun epicGameDao(): EpicGameDao
         fun gogGameDao(): GOGGameDao
         fun amazonGameDao(): AmazonGameDao
+        fun itchGameDao(): ItchGameDao
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -56,6 +58,7 @@ object FrontendSyncManager {
     private lateinit var epicGameDao: EpicGameDao
     private lateinit var gogGameDao: GOGGameDao
     private lateinit var amazonGameDao: AmazonGameDao
+    private lateinit var itchGameDao: ItchGameDao
 
     /** True while a [resyncAll] job is in progress. */
     private val _isSyncing = MutableStateFlow(false)
@@ -89,6 +92,7 @@ object FrontendSyncManager {
         epicGameDao = ep.epicGameDao()
         gogGameDao = ep.gogGameDao()
         amazonGameDao = ep.amazonGameDao()
+        itchGameDao = ep.itchGameDao()
 
         PluviaApp.events.on<AndroidEvent.LibraryInstallStatusChanged, Unit>(onInstallStatusChanged)
 

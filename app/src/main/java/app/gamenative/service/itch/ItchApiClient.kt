@@ -18,49 +18,49 @@ internal val apiUrlRoot : String = "https://api.itch.io";
 @Serializable
 data class OwnedKey(
     @SerialName("created_at")
-    val createdAt: String,
+    val createdAt: String? = null,
     @SerialName("game_id")
     val gameId: Long,
     @SerialName("purchase_id")
-    val purchaseId: Long,
+    val purchaseId: Long? = null,
     val id: Long,
-    val downloads: Long,
+    val downloads: Long? = null,
     @SerialName("updated_at")
-    val updatedAt: String,
+    val updatedAt: String? = null,
     val game: Game,
 )
 
 @Serializable
 data class Game(
     @SerialName("created_at")
-    val createdAt: String,
-    val type: String,
+    val createdAt: String? = null,
+    val type: String? = null,
     @SerialName("published_at")
-    val publishedAt: String,
+    val publishedAt: String? = null,
     @SerialName("short_text")
-    val shortText: String,
+    val shortText: String? = null,
     @SerialName("min_price")
-    val minPrice: Long,
+    val minPrice: Long? = null,
     val title: String,
-    val classification: String,
+    val classification: String? = null,
     val id: Long,
     val url: String,
     @SerialName("cover_url")
-    val coverUrl: String,
-    val traits: List<String>,
-    val user: User,
+    val coverUrl: String? = null,
+    val traits: List<String>? = null,
+    val user: User? = null,
 )
 
 @Serializable
 data class User(
     @SerialName("cover_url")
-    val coverUrl: String?,
+    val coverUrl: String? = null,
     val id: Long,
-    val url: String,
+    val url: String? = null,
     val username: String,
 
     @SerialName("display_name")
-    val displayName: String?,
+    val displayName: String? = null,
 )
 
 @Serializable
@@ -162,7 +162,7 @@ object ItchApiClient {
     public suspend fun getOwnedKeys(auth : ItchAuth) : Result<List<OwnedKey>>
     {
         try {
-            val ownedKeysUrl = "$apiUrlRoot/owned-keys".toHttpUrl();
+            val ownedKeysUrl = "$apiUrlRoot/profile/owned-keys".toHttpUrl();
             val ownedKeysResponse = makeApiCall<OwnedKeysResponse>(auth, ownedKeysUrl).getOrThrow();
             return Result.success(ownedKeysResponse.ownedKeys); // todo: pages. it's just a query param ?pages=5
         } catch (e : Exception) {
@@ -191,6 +191,8 @@ object ItchApiClient {
             .header("Authorization", "Bearer $apiKey")
             .build();
 
+        Timber.tag("itch").i("Making itch api call to ${request.url}");
+
         val serialisedHttpResponse = withContext(Dispatchers.IO) {
             httpClient.newCall(request).execute()
         }.use { response ->
@@ -209,6 +211,7 @@ object ItchApiClient {
                 val profileResponse = jsonSerializer.decodeFromString<TResponse>(responseBody);
                 profileResponse;
             } catch (e: SerializationException) {
+                Timber.tag("itch").e("Unable to deserialize API response - ${e.message}");
                 return Result.failure(Exception("Unable to deserialize API response - ${e.message}"));
             }
         }

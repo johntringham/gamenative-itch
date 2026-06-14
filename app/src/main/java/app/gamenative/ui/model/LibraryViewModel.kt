@@ -60,6 +60,8 @@ import app.gamenative.data.RecommendationRepository
 import app.gamenative.data.RecommendedGame
 import app.gamenative.utils.DeviceGameStatsCache
 import app.gamenative.utils.GpuGameStatsCache
+import app.gamenative.db.dao.ItchGameDao
+import app.gamenative.service.itch.ItchService
 import app.gamenative.utils.GameCompatibilityCache
 import app.gamenative.utils.GameCompatibilityService
 import app.gamenative.utils.HardwareUtils
@@ -100,6 +102,7 @@ class LibraryViewModel @Inject constructor(
     private val gogGameDao: GOGGameDao,
     private val epicGameDao: EpicGameDao,
     private val amazonGameDao: AmazonGameDao,
+    private val itchGameDao: ItchGameDao,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -646,6 +649,10 @@ class LibraryViewModel @Inject constructor(
                 if (AmazonService.hasStoredCredentials(context)) {
                     Timber.tag("LibraryViewModel").i("Triggering Amazon library refresh")
                     AmazonService.triggerLibrarySync(context)
+                }
+                if (ItchService.hasStoredCredentials(context)) {
+                    Timber.tag("LibraryViewModel").i("Triggering Itch library refresh")
+                    ItchService.triggerLibrarySync(context)
                 }
             } catch (e: Exception) {
                 Timber.tag("LibraryViewModel").e(e, "Failed to refresh owned games from server")
@@ -1480,3 +1487,4 @@ class LibraryViewModel @Inject constructor(
         response: GameCompatibilityService.GameCompatibilityResponse,
     ): GameCompatibilityStatus = GameCompatibilityService.statusFor(response)
 }
+

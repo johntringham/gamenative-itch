@@ -92,6 +92,8 @@ import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
 import app.gamenative.api.AccountApi
 import app.gamenative.api.DebugReportApi
+import app.gamenative.service.itch.ItchAuthManager
+import app.gamenative.service.itch.ItchService
 import app.gamenative.api.SupportApi
 import app.gamenative.ui.component.dialog.AI_HELP_PATH_APP
 import app.gamenative.ui.component.dialog.AccountSignInDialog
@@ -923,6 +925,16 @@ fun PluviaMain(
             ) {
                 Timber.d("[PluviaMain]: Starting AmazonService for logged-in user")
                 AmazonService.start(context)
+            }
+
+            // Start ItchService if user has Itch
+            if (ItchAuthManager.hasStoredCredentials(context) &&
+                !ItchService.isRunning
+            ) {
+                Timber.tag("itch").d("[PluviaMain]: Starting ItchService for logged-in user")
+                ItchService.start(context)
+            } else {
+                Timber.tag("itch").d("Itch SERVICE Not going to start: ${ItchService.isRunning}")
             }
 
             // Handle navigation when already logged in (e.g., app resumed with active session)
@@ -3292,3 +3304,4 @@ fun preLaunchApp(
         }
     }
 }
+

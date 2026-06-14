@@ -12,7 +12,9 @@ import app.gamenative.db.dao.AmazonGameDao
 import app.gamenative.db.dao.AppInfoDao
 import app.gamenative.db.dao.EpicGameDao
 import app.gamenative.db.dao.GOGGameDao
+import app.gamenative.db.dao.ItchGameDao
 import app.gamenative.db.dao.SteamAppDao
+import app.gamenative.di.DatabaseModule_ProvideItchGameDaoFactory
 import app.gamenative.enums.AppType
 import app.gamenative.enums.OSArch
 import app.gamenative.events.AndroidEvent
@@ -54,6 +56,7 @@ object ContainerStorageManager {
         fun gogGameDao(): GOGGameDao
         fun epicGameDao(): EpicGameDao
         fun amazonGameDao(): AmazonGameDao
+        fun itchGameDao(): ItchGameDao
     }
 
     enum class Status {

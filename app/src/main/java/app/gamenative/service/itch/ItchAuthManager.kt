@@ -1,6 +1,7 @@
 package app.gamenative.service.itch
 
 import android.content.Context
+import app.gamenative.service.gog.GOGAuthManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -86,6 +87,21 @@ object ItchAuthManager {
         } catch (e: Exception) {
             Timber.tag("itch").e(e, "Failed to get stored credentials")
             Result.failure(e)
+        }
+    }
+
+    fun clearStoredCredentials(context: Context): Boolean
+    {
+        return try {
+            val authFile = File(getAuthConfigPath(context))
+            if (authFile.exists()) {
+                authFile.delete()
+            } else {
+                true
+            }
+        } catch (e: Exception) {
+            Timber.tag("itch").e(e, "Failed to clear itch credentials")
+            false
         }
     }
 }
