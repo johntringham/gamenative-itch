@@ -1320,6 +1320,13 @@ object PrefManager {
             setPref(SHOW_GOG_IN_LIBRARY, value)
         }
 
+    private val SHOW_ITCH_IN_LIBRARY = booleanPreferencesKey("show_itch_in_library")
+    var showItchInLibrary: Boolean
+        get() = getPref(SHOW_ITCH_IN_LIBRARY, true)
+        set(value) {
+            setPref(SHOW_ITCH_IN_LIBRARY, value)
+        }
+
     private val SHOW_EPIC_IN_LIBRARY = booleanPreferencesKey("show_epic_in_library")
     var showEpicInLibrary: Boolean
         get() = getPref(SHOW_EPIC_IN_LIBRARY, true)

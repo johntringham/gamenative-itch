@@ -33,6 +33,7 @@ data class LibraryState(
     val showGOGInLibrary: Boolean = PrefManager.showGOGInLibrary,
     val showEpicInLibrary: Boolean = PrefManager.showEpicInLibrary,
     val showAmazonInLibrary: Boolean = PrefManager.showAmazonInLibrary,
+    val showItchInLibrary: Boolean = PrefManager.showGOGInLibrary,
 
     // Steam collections filter
     val selectedSteamCollectionIds: Set<String> = PrefManager.librarySteamCollections,

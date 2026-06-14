@@ -1161,6 +1161,12 @@ class LibraryViewModel @Inject constructor(
                 currentTab.showAmazon
             }) && AmazonService.hasStoredCredentials(context)
 
+            val includeItch = (if (currentTab == app.gamenative.ui.enums.LibraryTab.ALL) {
+                currentState.showItchInLibrary
+            } else {
+                currentTab.showItch
+            }) //&& ItchService.hasStoredCredentials(context) - TODO - check creds for this thing
+
             // Combine both lists and apply sort option
             val sortComparator: Comparator<LibraryEntry> = when (currentState.currentSortOption) {
                 SortOption.INSTALLED_FIRST -> compareBy<LibraryEntry> { entry ->

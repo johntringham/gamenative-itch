@@ -132,6 +132,7 @@
     <string name="tab_gog">GOG</string>
     <string name="tab_epic">Epic</string>
     <string name="tab_amazon">Amazon</string>
+    <string name="tab_itch">Itch</string>
     <string name="tab_installed">Installed</string>
     <string name="tab_local">Custom</string>
     <string name="library_tab_with_count">%1$s (%2$d)</string>
@@ -1746,6 +1747,7 @@
     <string name="library_source_not_logged_in_gog">Sign in to GOG to see your library</string>
     <string name="library_source_not_logged_in_epic">Sign in to Epic to see your library</string>
     <string name="library_source_not_logged_in_amazon">Sign in to Amazon to see your library</string>
+    <string name="library_source_not_logged_in_itch">Sign in to Itch to see your library</string>
     <string name="library_source_no_custom_games">No custom games added yet</string>
     <string name="library_layout_title">Layout</string>
     <string name="library_options">Options</string>
@@ -1976,6 +1978,21 @@
     <string name="manifest_content_untrusted">Content is not trusted and was not installed.</string>
     <string name="manifest_type_mismatch">Downloaded content does not match expected type.</string>
     <string name="manifest_glibc_not_supported">GLIBC builds are not supported.</string>
+
+    <!-- itch Integration -->
+    <string name="itch_integration_title">itch Integration (Alpha)</string>
+    <string name="itch_settings_login_title">Sign in to itch</string>
+    <string name="itch_settings_login_subtitle">Sign in to your itch account</string>
+    <string name="itch_login_success_title">Login Successful</string>
+    <string name="itch_login_cancel">Cancel</string>
+    <string name="itch_settings_logout_title">Sign out of itch</string>
+    <string name="itch_settings_logout_subtitle">Sign out from your itch account</string>
+    <string name="itch_logout_confirm_title">Logout from itch?</string>
+    <string name="itch_logout_confirm_message">This will remove your itch credentials and clear your itch library from this device. You can sign in again at any time.</string>
+    <string name="itch_logout_confirm">Logout</string>
+    <string name="itch_logout_success">Logged out from itch successfully</string>
+    <string name="itch_logout_failed">Failed to logout: %s</string>
+    <string name="itch_logout_in_progress">Logging out from itch…</string>
 
     <!-- Workshop -->
     <string name="workshop_checking_mods">Checking Workshop mods…</string>
