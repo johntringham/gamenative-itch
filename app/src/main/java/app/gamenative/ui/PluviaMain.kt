@@ -244,6 +244,10 @@ private fun resolveGameAppId(context: Context, appId: String): GameResolutionRes
             AmazonService.isGameInstalledByAppId(context, gameId)
         }
 
+        GameSource.ITCH -> {
+            ItchService.isGameInstalled(gameId.toLong())
+        }
+
         GameSource.CUSTOM_GAME -> {
             CustomGameScanner.isGameInstalled(gameId)
         }
@@ -2376,6 +2380,7 @@ fun preLaunchApp(
                 GameSource.EPIC -> EpicService.getLaunchExecutable(appId)
                 GameSource.CUSTOM_GAME -> CustomGameScanner.getLaunchExecutable(container)
                 GameSource.AMAZON -> AmazonService.getLaunchExecutable(appId)
+                GameSource.ITCH -> ItchService.getLaunchExecutable(appId)
             }
             if (effectiveExe.isBlank()) {
                 Timber.tag("preLaunchApp").w("Cannot launch $appId: no executable found (game source: $gameSource)")

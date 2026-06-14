@@ -431,6 +431,10 @@ class ItchService : Service() {
             return Result.failure(Exception("haven't implemented this yet"))
         }
 
+        fun getLaunchExecutable(appId: String): String {
+            TODO("Not yet implemented")
+        }
+
 //        suspend fun refreshSingleGame(gameId: String, context: Context): Result<ItchGame?> {
 //            return getInstance()?.itchManager?.refreshSingleGame(gameId, context)
 //                ?: Result.failure(Exception("Service not available"))

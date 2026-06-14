@@ -1574,6 +1574,7 @@ object PrefManager {
     private val FRONTEND_SYNC_DIR_EPIC = stringPreferencesKey("frontend_sync_dir_epic")
     private val FRONTEND_SYNC_DIR_GOG = stringPreferencesKey("frontend_sync_dir_gog")
     private val FRONTEND_SYNC_DIR_AMAZON = stringPreferencesKey("frontend_sync_dir_amazon")
+    private val FRONTEND_SYNC_DIR_ITCH = stringPreferencesKey("frontend_sync_dir_itch")
     private val FRONTEND_SYNC_DIR_CUSTOM = stringPreferencesKey("frontend_sync_dir_custom")
 
     var frontendSyncDirSteam: String
@@ -1592,6 +1593,10 @@ object PrefManager {
         get() = getPref(FRONTEND_SYNC_DIR_AMAZON, "")
         set(value) { setPref(FRONTEND_SYNC_DIR_AMAZON, value) }
 
+    var frontendSyncDirItch: String
+        get() = getPref(FRONTEND_SYNC_DIR_ITCH, "")
+        set(value) { setPref(FRONTEND_SYNC_DIR_ITCH, value) }
+
     var frontendSyncDirCustom: String
         get() = getPref(FRONTEND_SYNC_DIR_CUSTOM, "")
         set(value) { setPref(FRONTEND_SYNC_DIR_CUSTOM, value) }
@@ -1602,6 +1607,7 @@ object PrefManager {
         GameSource.EPIC -> frontendSyncDirEpic
         GameSource.GOG -> frontendSyncDirGog
         GameSource.AMAZON -> frontendSyncDirAmazon
+        GameSource.ITCH -> frontendSyncDirAmazon
         GameSource.CUSTOM_GAME -> frontendSyncDirCustom
     }
 
