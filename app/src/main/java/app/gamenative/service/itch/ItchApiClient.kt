@@ -7,46 +7,48 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.Request
 import timber.log.Timber
 
 private val httpClient = Net.http
 internal val apiUrlRoot : String = "https://api.itch.io";
 
 @Serializable
-data class OwnedKeysResponse(
-    val page: Long,
-    val perPage: Long,
-    val ownedKeys: List<OwnedKey>,
-)
-
-@Serializable
 data class OwnedKey(
-    val purchaseId: Long?,
+    @SerialName("created_at")
+    val createdAt: String,
+    @SerialName("game_id")
+    val gameId: Long,
+    @SerialName("purchase_id")
+    val purchaseId: Long,
     val id: Long,
     val downloads: Long,
-    val createdAt: String,
+    @SerialName("updated_at")
     val updatedAt: String,
     val game: Game,
-    val gameId: Long,
 )
 
 @Serializable
 data class Game(
-    val id: Long,
-    val type: String,
+    @SerialName("created_at")
     val createdAt: String,
-    val publishedAt: String?,
+    val type: String,
+    @SerialName("published_at")
+    val publishedAt: String,
+    @SerialName("short_text")
+    val shortText: String,
+    @SerialName("min_price")
     val minPrice: Long,
-    val user: User,
+    val title: String,
     val classification: String,
-    val shortText: String?,
+    val id: Long,
+    val url: String,
+    @SerialName("cover_url")
     val coverUrl: String,
     val traits: List<String>,
-    val url: String,
-    val title: String,
-    val stillCoverUrl: String?,
-    val sale: Sale?,
+    val user: User,
 )
 
 @Serializable
@@ -60,17 +62,66 @@ data class User(
     @SerialName("display_name")
     val displayName: String?,
 )
+
 @Serializable
-data class ProfileResponse(
-    val user : User
+data class Upload(
+    @SerialName("channel_name")
+    val channelName: String,
+    val position: Long,
+    @SerialName("game_id")
+    val gameId: Long,
+    @SerialName("created_at")
+    val createdAt: String,
+    @SerialName("display_name")
+    val displayName: String,
+    val traits: List<String>,
+    val filename: String,
+    @SerialName("build_id")
+    val buildId: Long,
+    val size: Long,
+    @SerialName("updated_at")
+    val updatedAt: String,
+    val build: Build,
+    val id: Long,
+    val type: String,
+    val storage: String,
 )
 
 @Serializable
-data class Sale(
-    val startDate: String,
+data class Build(
+    @SerialName("upload_id")
+    val uploadId: Long,
+    @SerialName("created_at")
+    val createdAt: String,
+    val state: String,
+    @SerialName("user_id")
+    val userId: Long,
+    @SerialName("updated_at")
+    val updatedAt: String,
     val id: Long,
-    val endDate: String,
-    val rate: Long,
+    val version: Long,
+    @SerialName("game_id")
+    val gameId: Long,
+    @SerialName("parent_build_id")
+    val parentBuildId: Long,
+)
+
+
+@Serializable
+data class OwnedKeysResponse(
+    val page: Long,
+    @SerialName("owned_keys")
+    val ownedKeys: List<OwnedKey>,
+)
+
+@Serializable
+data class UploadsResponse(
+    val uploads: List<Upload>,
+)
+
+@Serializable
+data class ProfileResponse(
+    val user : User
 )
 
 object ItchApiClient {
@@ -106,5 +157,62 @@ object ItchApiClient {
         }
 
         return Result.success(profileResponse.user);
+    }
+
+    public suspend fun getOwnedKeys(auth : ItchAuth) : Result<List<OwnedKey>>
+    {
+        try {
+            val ownedKeysUrl = "$apiUrlRoot/owned-keys".toHttpUrl();
+            val ownedKeysResponse = makeApiCall<OwnedKeysResponse>(auth, ownedKeysUrl).getOrThrow();
+            return Result.success(ownedKeysResponse.ownedKeys); // todo: pages. it's just a query param ?pages=5
+        } catch (e : Exception) {
+            return Result.failure(Exception("Failed to get games list"))
+        }
+    }
+
+    public suspend fun getGameUploads(auth : ItchAuth, ownedKey: OwnedKey) : Result<List<Upload>>
+    {
+        try {
+            val url = "$apiUrlRoot/games/${ownedKey.gameId}/uploads?download_key_id=${ownedKey.id}".toHttpUrl();
+            val response = makeApiCall<UploadsResponse>(auth, url).getOrThrow();
+            return Result.success(response.uploads);
+        } catch (e : Exception) {
+            return Result.failure(Exception("Failed to get game uploads"))
+        }
+    }
+
+    private suspend inline fun <reified TResponse> makeApiCall(
+        auth: ItchAuth,
+        url: HttpUrl
+    ): Result<TResponse> {
+        val apiKey = auth.apiKey;
+        val request = Request.Builder().url(url)
+            .get()
+            .header("Authorization", "Bearer $apiKey")
+            .build();
+
+        val serialisedHttpResponse = withContext(Dispatchers.IO) {
+            httpClient.newCall(request).execute()
+        }.use { response ->
+            Timber.tag("itch");
+
+            if (response.isSuccessful == false) {
+                val errorBody = response.body?.string() ?: "Unknown error";
+                Timber.tag("itch").e("API key check failed");
+                return Result.failure(Exception("failed to auth: ${response.code} - $errorBody"));
+            }
+
+            val responseBody = response.body?.string() ?: return Result.failure(Exception("Empty response"))
+            Timber.tag("itch").d("Response body received, length: ${responseBody.length}")
+
+            try {
+                val profileResponse = jsonSerializer.decodeFromString<TResponse>(responseBody);
+                profileResponse;
+            } catch (e: SerializationException) {
+                return Result.failure(Exception("Unable to deserialize API response - ${e.message}"));
+            }
+        }
+
+        return Result.success(serialisedHttpResponse);
     }
 }

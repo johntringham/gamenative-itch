@@ -119,6 +119,7 @@ import app.gamenative.utils.SteamUtils
 import com.posthog.PostHog
 import kotlinx.coroutines.launch
 import android.os.SystemClock
+import app.gamenative.service.itch.ItchAuthManager
 import app.gamenative.ui.screen.auth.ItchAuthActivity
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1062,7 +1063,7 @@ private fun LibraryScreenContent(
                     LibraryTab.GOG -> !GOGService.hasStoredCredentials(context)
                     LibraryTab.EPIC -> !EpicService.hasStoredCredentials(context)
                     LibraryTab.AMAZON -> !AmazonService.hasStoredCredentials(context)
-                    LibraryTab.ITCH -> true
+                    LibraryTab.ITCH -> !ItchAuthManager.hasStoredCredentials(context)
                     LibraryTab.LOCAL -> PrefManager.customGamesCount == 0
                     else -> false
                 }
