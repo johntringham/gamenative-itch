@@ -1,20 +1,22 @@
 package app.gamenative.service.itch
 
 import android.content.Context
-import app.gamenative.service.gog.GOGAuthManager
-import app.gamenative.utils.Net
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.HttpUrl.Companion.toHttpUrl
-import org.json.JSONObject
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import timber.log.Timber
 import java.io.File
 
+@Serializable
+data class ItchAuth (
+    val apiKey : String,
+    val userName : String,
+    val displayName: String?,
+    val userId : Long,
+)
+
 object ItchAuthManager {
-
-    private val httpClient = Net.http
-    internal val apiUrlRoot : String = "https://api.itch.io";
-
     fun getAuthConfigPath(context: Context): String {
         return "${context.filesDir}/itch_auth.json"
     }
@@ -24,11 +26,18 @@ object ItchAuthManager {
         return authFile.exists()
     }
 
-    suspend fun authenticateWithApiKey(context : Context, apiKey : String) : Result<ItchCredentials>{
+    suspend fun authenticateWithApiKey(context : Context, apiKey : String) : Result<ItchAuth>{
         Timber.tag("Starting itch auth with API key");
 
         if(apiKey.isEmpty()){
             return Result.failure(Exception("Empty Itch API key"));
+        }
+
+        val userResult = ItchApiClient.getProfile(apiKey);
+        if(userResult.isSuccess == false)
+        {
+            Timber.tag("itch").e("Failed to fetch user profile, probably invalid API key");
+            return Result.failure(Exception("Failed to check API key"));
         }
 
         val authConfigPath = ItchAuthManager.getAuthConfigPath(context)
@@ -43,36 +52,40 @@ object ItchAuthManager {
 
         Timber.tag("itch").d("Validating API key by fetching user profile");
 
-        val profileUrl = "$apiUrlRoot/profile".toHttpUrl();
-        val request = okhttp3.Request.Builder().url(profileUrl).get().header("Authorization", "Bearer $apiKey").build();
+        val user = userResult.getOrThrow();
+        // Store credentials to file
+        val authData = ItchAuth(
+            apiKey,
+            user.username,
+            user.displayName,
+            user.id
+        )
 
-        val profileJson = withContext(Dispatchers.IO){
-            httpClient.newCall(request).execute()
-        }.use { response ->
-            Timber.tag("itch");
+        withContext(Dispatchers.IO) {
+            authFile.writeText(Json.encodeToString(authData));
+        }
+        Timber.tag("itch").d("Itch auth written to file");
 
-            if(response.isSuccessful == false){
-                val errorBody = response.body?.string() ?: "Unknown error";
-                Timber.tag("itch").e("API key check failed");
-                return Result.failure(Exception("failed to auth: ${response.code} - $errorBody"));
+        return Result.success(authData);
+    }
+
+    /**
+     * Get user credentials from storage
+     */
+    suspend fun getStoredCredentials(context: Context): Result<ItchAuth> {
+        return try {
+            if (!hasStoredCredentials(context)) {
+                return Result.failure(Exception("No stored credentials found"))
             }
 
-            val responseBody = response.body?.string() ?: return Result.failure(Exception("Empty response"))
-            Timber.tag("itch").d("Response body received, length: ${responseBody.length}")
-            val response = JSONObject(responseBody);
-
-            // todo: delete this, don't want to log this
-            Timber.tag("itch").i(response.toString(2));
-
-            response;
+            // Read credentials from file (IO dispatcher)
+            val authFile = File(getAuthConfigPath(context))
+            val authContent = withContext(Dispatchers.IO) { authFile.readText() }
+            val authJson = Json.decodeFromString<ItchAuth>(authContent);
+            return Result.success(authJson);
+        } catch (e: Exception) {
+            Timber.tag("itch").e(e, "Failed to get stored credentials")
+            Result.failure(e)
         }
-
-        return Result.failure(Exception("failed :("));
     }
 }
-
-data class ItchCredentials (
-    val userName : String,
-    val displayName : String,
-    val apiKey : String,
-)
