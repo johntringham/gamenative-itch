@@ -8,6 +8,7 @@ import android.os.IBinder
 import app.gamenative.PluviaApp
 import app.gamenative.data.DownloadInfo
 import app.gamenative.data.ItchGame
+import app.gamenative.data.LibraryItem
 import app.gamenative.events.AndroidEvent
 import app.gamenative.service.NotificationHelper
 import dagger.hilt.android.AndroidEntryPoint
@@ -20,6 +21,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.io.File
+import java.nio.file.Paths
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
@@ -41,6 +44,8 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class ItchService : Service() {
     companion object {
+        val externalItchGamesPath: String? = null;
+        val internalItchGamesPath: String? = null;
         private const val ACTION_SYNC_LIBRARY = "app.gamenative.ITCH_SYNC_LIBRARY"
         private const val ACTION_MANUAL_SYNC = "app.gamenative.ITCH_MANUAL_SYNC"
         private const val SYNC_THROTTLE_MILLIS = 15 * 60 * 1000L // 15 minutes
@@ -160,6 +165,12 @@ class ItchService : Service() {
                     Result.failure(e)
                 }
             }
+        }
+
+        fun internalItchGamesPath(context: android.content.Context): String {
+            val path = Paths.get(context.dataDir.path, "Itch", "games").toString()
+            File(path).mkdirs()
+            return path
         }
 
         // ==========================================================================
@@ -432,6 +443,10 @@ class ItchService : Service() {
         }
 
         fun getLaunchExecutable(appId: String): String {
+            TODO("Not yet implemented")
+        }
+
+        fun deleteGame(context: Context, libraryItem: LibraryItem) : Result<Unit> {
             TODO("Not yet implemented")
         }
 

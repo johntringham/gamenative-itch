@@ -27,6 +27,8 @@ import app.gamenative.service.epic.EpicConstants
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGConstants
 import app.gamenative.service.gog.GOGService
+import app.gamenative.service.itch.ItchConstants
+import app.gamenative.service.itch.ItchService
 import com.winlator.core.FileUtils
 import com.winlator.xenvironment.ImageFs
 import dagger.hilt.EntryPoint
@@ -307,6 +309,15 @@ object ContainerStorageManager {
         } else {
             null
         }
+        val itchGame = if (gameSource == GameSource.ITCH) {
+            val gameId = extractGameId(normalizedContainerId)
+                ?: return@withContext Result.failure(IllegalArgumentException("Invalid itch game id"))
+            entryPoint.itchGameDao().getById(gameId.toLong())
+                ?: return@withContext Result.failure(IllegalStateException("Itch game not found in database"))
+        } else {
+            null
+        }
+
 
         Timber.tag("ContainerStorageManager").i(
             "Moving game %s from %s to %s",
@@ -345,6 +356,12 @@ object ContainerStorageManager {
             GameSource.AMAZON -> {
                 amazonGame?.let {
                     entryPoint.amazonGameDao().markAsInstalled(it.productId, targetDir.absolutePath, installSize, it.versionId)
+                }
+            }
+
+            GameSource.ITCH -> {
+                itchGame?.let {
+                    entryPoint.itchGameDao().update(it.copy(installPath = targetDir.absolutePath, installSize = installSize))
                 }
             }
 
@@ -450,6 +467,19 @@ object ContainerStorageManager {
                     val productId = AmazonService.getProductIdByAppId(gameId)
                         ?: return@withContext Result.failure(Exception("Amazon product id not found"))
                     val result = AmazonService.deleteGame(context, productId)
+                    if (result.isSuccess && entry.hasContainer) removeContainer(context, entry.containerId)
+                    result
+                }
+
+                GameSource.ITCH -> {
+                    val result = ItchService.deleteGame(
+                        context,
+                        LibraryItem(
+                            appId = normalizedContainerId,
+                            name = entry.displayName,
+                            gameSource = GameSource.ITCH,
+                        ),
+                    )
                     if (result.isSuccess && entry.hasContainer) removeContainer(context, entry.containerId)
                     result
                 }
@@ -782,6 +812,11 @@ object ContainerStorageManager {
                 MoveTarget.EXTERNAL -> AmazonConstants.externalAmazonGamesPath()
             }
 
+            GameSource.ITCH -> when (target) {
+                MoveTarget.INTERNAL -> ItchConstants.internalItchGamesPath(context)
+                MoveTarget.EXTERNAL -> ItchConstants.externalItchGamesPath()
+            }
+
             GameSource.CUSTOM_GAME -> null
         }
     }
@@ -802,6 +837,7 @@ object ContainerStorageManager {
             GameSource.GOG -> listOf(GOGConstants.internalGOGGamesPath)
             GameSource.EPIC -> listOf(EpicConstants.internalEpicGamesPath(context))
             GameSource.AMAZON -> listOf(AmazonConstants.internalAmazonGamesPath(context))
+            GameSource.ITCH -> listOf(ItchService.internalItchGamesPath(context)) // todo
             GameSource.CUSTOM_GAME -> emptyList()
         }
 
@@ -825,6 +861,7 @@ object ContainerStorageManager {
                 GameSource.GOG -> if (PrefManager.externalStoragePath.isNotBlank()) add(GOGConstants.externalGOGGamesPath)
                 GameSource.EPIC -> if (PrefManager.externalStoragePath.isNotBlank()) add(EpicConstants.externalEpicGamesPath())
                 GameSource.AMAZON -> if (PrefManager.externalStoragePath.isNotBlank()) add(AmazonConstants.externalAmazonGamesPath())
+                GameSource.ITCH -> if (PrefManager.externalStoragePath.isNotBlank()) add(ItchConstants.externalItchGamesPath())
                 GameSource.CUSTOM_GAME -> Unit
             }
 
@@ -846,6 +883,7 @@ object ContainerStorageManager {
             GameSource.GOG -> listOf("GOG", "games", "common")
             GameSource.EPIC -> listOf("Epic", "games")
             GameSource.AMAZON -> listOf("Amazon", "games")
+            GameSource.ITCH -> listOf("Itch", "games")
             GameSource.CUSTOM_GAME -> emptyList()
         }
         if (expectedRootSegments.isEmpty()) return null
@@ -1030,6 +1068,16 @@ object ContainerStorageManager {
                     name = game?.title,
                     installPath = game?.installPath,
                     iconUrl = game?.artUrl.orEmpty(),
+                    known = game != null,
+                )
+            }
+
+            GameSource.ITCH -> {
+                val game = ItchService.getItchGameOf(gameId.toLong())
+                ResolvedGame(
+                    name = game?.title,
+                    installPath = game?.installPath,
+                    iconUrl = game?.iconUrl?.ifEmpty { game.imageUrl }.orEmpty(),
                     known = game != null,
                 )
             }

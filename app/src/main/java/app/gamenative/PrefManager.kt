@@ -1618,6 +1618,7 @@ object PrefManager {
             GameSource.EPIC -> frontendSyncDirEpic = path
             GameSource.GOG -> frontendSyncDirGog = path
             GameSource.AMAZON -> frontendSyncDirAmazon = path
+            GameSource.ITCH -> frontendSyncDirItch = path
             GameSource.CUSTOM_GAME -> frontendSyncDirCustom = path
         }
     }

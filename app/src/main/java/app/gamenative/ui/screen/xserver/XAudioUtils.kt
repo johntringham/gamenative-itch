@@ -8,6 +8,7 @@ import app.gamenative.service.SteamService
 import app.gamenative.service.amazon.AmazonService
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
+import app.gamenative.service.itch.ItchService
 import app.gamenative.utils.ContainerUtils
 import app.gamenative.utils.CustomGameScanner
 import app.gamenative.utils.FileUtils
@@ -38,6 +39,7 @@ object XAudioUtils {
                     EpicService.getInstallPath(gameId)
                 }
                 GameSource.AMAZON -> AmazonService.getInstallPath(appId)
+                GameSource.ITCH -> ItchService.getInstallPath(appId.toLongOrNull() ?: 0)
                 GameSource.CUSTOM_GAME -> CustomGameScanner.getFolderPathFromAppId(appId)
             }
         } catch (e: Exception) {
