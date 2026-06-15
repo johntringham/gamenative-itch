@@ -125,33 +125,34 @@ object ItchConstants {
         File(path).mkdirs()
         return path
     }
+
 //
 //    /**
-//     * Default Epic games installation path - uses external storage if available
+//     * Default Itch games installation path - uses external storage if available
 //     */
-//    fun defaultEpicGamesPath(context: Context): String {
-//        return if (PrefManager.useExternalStorage && File(PrefManager.externalStoragePath).exists()) {
-//            val path = externalEpicGamesPath()
-//            Timber.i("Epic using external storage: $path")
-//            path
-//        } else {
-//            val path = internalEpicGamesPath(context)
-//            Timber.i("Epic using internal storage: $path")
-//            // Ensure directory exists for StatFs
-//            File(path).mkdirs()
-//            path
-//        }
-//    }
+    fun defaultItchGamesPath(context: Context): String {
+        return if (PrefManager.useExternalStorage && File(PrefManager.externalStoragePath).exists()) {
+            val path = externalItchGamesPath()
+            Timber.i("Itch using external storage: $path")
+            path
+        } else {
+            val path = internalItchGamesPath(context)
+            Timber.i("Itch using internal storage: $path")
+            // Ensure directory exists for StatFs
+            File(path).mkdirs()
+            path
+        }
+    }
 //
 //    /**
 //     * Get the installation path for a specific Epic game
 //     * Sanitizes the game title to be filesystem-safe
 //     */
-//    fun getGameInstallPath(context: Context, gameTitle: String): String {
-//        // Sanitize game title for filesystem
-//        val sanitizedTitle = gameTitle.replace(Regex("[^a-zA-Z0-9 \\-_]"), "").trim()
-//        return Paths.get(defaultEpicGamesPath(context), sanitizedTitle).toString()
-//    }
+    fun getGameInstallPath(context: Context, gameTitle: String): String {
+        // Sanitize game title for filesystem
+        val sanitizedTitle = gameTitle.replace(Regex("[^a-zA-Z0-9 \\-_]"), "").trim()
+        return Paths.get(defaultItchGamesPath(context), sanitizedTitle).toString()
+    }
 //
 //    /**
 //     * Get build version for user agent

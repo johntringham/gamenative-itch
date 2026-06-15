@@ -208,19 +208,19 @@ class ItchService : Service() {
         fun getActiveDownloads(): Map<String, DownloadInfo> =
             getInstance()?.activeDownloads?.let { HashMap(it) } ?: emptyMap()
 
-//        private fun hasPartialDownload(game: ItchGame): Boolean {
-//            if (game.isInstalled) return false
-//            val title = game.title.ifBlank { return false }
-//            val installPath = ItchConstants.getGameInstallPath(title)
-//            return app.gamenative.utils.MarkerUtils.hasPartialInstall(installPath)
-//        }
-//
-//        fun hasPartialDownload(gameId: String, fallbackTitle: String? = null): Boolean {
-//            getItchGameOf(gameId)?.let { return hasPartialDownload(it) }
-//            val title = fallbackTitle?.ifBlank { null } ?: return false
-//            val installPath = ItchConstants.getGameInstallPath(title)
-//            return app.gamenative.utils.MarkerUtils.hasPartialInstall(installPath)
-//        }
+        fun hasPartialDownload(context : Context, game: ItchGame): Boolean {
+            if (game.isInstalled) return false
+            val title = game.title.ifBlank { return false }
+            val installPath = ItchConstants.getGameInstallPath(context,title)
+            return app.gamenative.utils.MarkerUtils.hasPartialInstall(installPath)
+        }
+
+        fun hasPartialDownload(context : Context, gameId: Long, fallbackTitle: String? = null): Boolean {
+            getItchGameOf(gameId)?.let { return hasPartialDownload(context,it) }
+            val title = fallbackTitle?.ifBlank { null } ?: return false
+            val installPath = ItchConstants.getGameInstallPath(context, title)
+            return app.gamenative.utils.MarkerUtils.hasPartialInstall(installPath)
+        }
 //
 //        private fun getPartialInstallPaths(): Set<String> {
 //            val roots = buildList {
@@ -281,9 +281,9 @@ class ItchService : Service() {
             }
         }
 
-        suspend fun updateItchGame(game: ItchGame) {
-            getInstance()?.itchManager?.updateGame(game)
-        }
+//        suspend fun updateItchGame(game: ItchGame) {
+//            getInstance()?.itchManager?.updateGame(game)
+//        }
 
         fun isGameInstalled(gameId: Long): Boolean {
             return runBlocking(Dispatchers.IO) {
@@ -319,13 +319,13 @@ class ItchService : Service() {
 //                ?: ""
 //        }
 
-//        /**
-//         * Resolves the effective launch executable for a Itch game (container config or auto-detected).
-//         * Returns empty string if no executable can be found.
-//         */
-//        suspend fun getLaunchExecutable(appId: String, container: com.winlator.container.Container): String {
-//            return getInstance()?.itchManager?.getLaunchExecutable(appId, container) ?: ""
-//        }
+        /**
+         * Resolves the effective launch executable for a Itch game (container config or auto-detected).
+         * Returns empty string if no executable can be found.
+         */
+        suspend fun getLaunchExecutable(appId: String, container: com.winlator.container.Container): String {
+            return getInstance()?.itchManager?.getLaunchExecutable(appId, container) ?: ""
+        }
 
         //  fun getGogWineStartCommand(
         //      libraryItem: LibraryItem,
@@ -442,13 +442,6 @@ class ItchService : Service() {
             return Result.failure(Exception("haven't implemented this yet"))
         }
 
-        fun getLaunchExecutable(appId: String): String {
-            TODO("Not yet implemented")
-        }
-
-        fun deleteGame(context: Context, libraryItem: LibraryItem) : Result<Unit> {
-            TODO("Not yet implemented")
-        }
 
 //        suspend fun refreshSingleGame(gameId: String, context: Context): Result<ItchGame?> {
 //            return getInstance()?.itchManager?.refreshSingleGame(gameId, context)
@@ -459,10 +452,10 @@ class ItchService : Service() {
          * Delete/uninstall a Itch game
          * Delegates to ItchManager.deleteGame
          */
-//        suspend fun deleteGame(context: Context, libraryItem: LibraryItem): Result<Unit> {
-//            return getInstance()?.itchManager?.deleteGame(context, libraryItem)
-//                ?: Result.failure(Exception("Service not available"))
-//        }
+        suspend fun deleteGame(context: Context, libraryItem: LibraryItem): Result<Unit> {
+            return getInstance()?.itchManager?.deleteGame(context, libraryItem)
+                ?: Result.failure(Exception("Service not available"))
+        }
 
         /**
          * Sync Itch cloud saves for a game

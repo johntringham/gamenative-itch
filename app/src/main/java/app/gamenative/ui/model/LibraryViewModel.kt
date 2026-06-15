@@ -1166,7 +1166,7 @@ class LibraryViewModel @Inject constructor(
                             headerImageUrl = game.imageUrl.ifEmpty { game.iconUrl },
                             heroImageUrl = game.imageUrl.ifEmpty { game.iconUrl },
                             isShared = false,
-                            gameSource = GameSource.GOG,
+                            gameSource = GameSource.ITCH,
                         ),
                         isInstalled = game.isInstalled,
                     )

@@ -176,6 +176,7 @@ import app.gamenative.ui.screen.library.appscreen.AmazonAppScreen
 import app.gamenative.ui.screen.library.appscreen.CustomGameAppScreen
 import app.gamenative.ui.screen.library.appscreen.EpicAppScreen
 import app.gamenative.ui.screen.library.appscreen.GOGAppScreen
+import app.gamenative.ui.screen.library.appscreen.ItchAppScreen
 import app.gamenative.ui.screen.library.appscreen.SteamAppScreen
 import app.gamenative.ui.screen.library.components.GameOptionsPanel
 import app.gamenative.ui.screen.library.components.VideoHero
@@ -879,7 +880,7 @@ fun AppScreen(
             app.gamenative.data.GameSource.CUSTOM_GAME -> CustomGameAppScreen()
             app.gamenative.data.GameSource.GOG -> GOGAppScreen()
             app.gamenative.data.GameSource.EPIC -> EpicAppScreen()
-            app.gamenative.data.GameSource.ITCH -> GOGAppScreen()
+            app.gamenative.data.GameSource.ITCH -> ItchAppScreen()
             app.gamenative.data.GameSource.AMAZON -> AmazonAppScreen()
         }
     }

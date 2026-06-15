@@ -1,11 +1,21 @@
 package app.gamenative.service.itch
 
 import android.content.Context
+import app.gamenative.data.GameSource
 import app.gamenative.data.ItchGame
+import app.gamenative.data.LibraryItem
 import app.gamenative.db.dao.ItchGameDao
 import app.gamenative.enums.AppType
+import app.gamenative.enums.Marker
+import app.gamenative.service.itch.ItchConstants.getGameInstallPath
+import app.gamenative.utils.ContainerUtils
+import app.gamenative.utils.MarkerUtils
+import com.winlator.container.Container
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -145,11 +155,110 @@ class ItchManager @Inject constructor(
         TODO("Not yet implemented")
     }
 
-    fun getGameFromDbById(gameId: Long): app.gamenative.data.ItchGame? {
-        return null;
+    suspend fun getGameFromDbById(gameId: Long): app.gamenative.data.ItchGame? {
+        return itchGameDao.getById(gameId);
     }
-    fun updateGame(game: ItchGame) {}
+//    fun updateGame(game: ItchGame) {}
     fun verifyInstallation(gameId: Long) : Pair<Boolean, String?> {
         return Pair(false, "haven't implemented this yet lol")
+    }
+
+    /**
+     * Resolves the effective launch executable for a GOG game (container config or auto-detected).
+     * Returns empty string if no executable can be found.
+     */
+    suspend fun getLaunchExecutable(appId: String, container: Container): String = withContext(Dispatchers.IO) {
+        container.executablePath.ifEmpty {
+            getInstalledExe(LibraryItem(appId = appId, name = "", gameSource = GameSource.GOG))
+        }
+    }
+
+    // Get the exe. There is a v1 and v2 depending on the age of the game.
+    suspend fun getInstalledExe(libraryItem: LibraryItem): String = withContext(Dispatchers.IO) {
+        val gameId = libraryItem.gameId.toLong()
+        try {
+//            val game = getGameFromDbById(gameId) ?: return@withContext ""
+//            val installPath = getGameInstallPath(context,game.id, game.title)
+
+//            // todo
+//
+//            // Try V1 structure: goggame-*.info and exe can be in install root or in a subdir
+//            val installDirFile = File(installPath)
+//            val exe = getGameExecutable(installPath, installDirFile)
+//            if (exe.isNotEmpty()) return@withContext exe
+//            val subdirs = installDirFile.listFiles()?.filter {
+//                it.isDirectory && it.name != "saves" && it.name != "_CommonRedist"
+//            } ?: emptyList()
+//
+//            for (subdir in subdirs) {
+//                val subdirExe = getGameExecutable(installPath, subdir)
+//                if (subdirExe.isNotEmpty()) return@withContext subdirExe
+//            }
+
+            ""
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to get executable for GOG game $gameId")
+            ""
+        }
+    }
+
+    suspend fun deleteGame(context: Context, libraryItem: LibraryItem): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val gameId = libraryItem.gameId.toLong()
+
+                val game = getGameFromDbById(gameId)
+                val storedPath = game?.installPath?.takeIf { it.isNotBlank() }
+                val computedPath = getGameInstallPath(context, libraryItem.name) // todo - is name the right choice here? - no
+                val pathsToClean = listOfNotNull(storedPath, computedPath).distinct()
+
+                val manifestPath = File(context.filesDir, "manifests/$gameId")
+                if (manifestPath.exists()) {
+                    manifestPath.delete()
+                    Timber.i("Deleted manifest file for game $gameId")
+                }
+
+                val failedPaths = mutableListOf<String>()
+                for (path in pathsToClean) {
+                    val dir = File(path)
+                    if (dir.exists()) {
+                        if (dir.deleteRecursively()) {
+                            Timber.i("Successfully deleted game directory: $path")
+                        } else {
+                            Timber.w("Failed to delete some game files at $path")
+                            failedPaths.add(path)
+                        }
+                    } else {
+                        Timber.w("GOG game directory doesn't exist: $path")
+                    }
+                    MarkerUtils.removeMarker(path, Marker.DOWNLOAD_COMPLETE_MARKER)
+                    MarkerUtils.removeMarker(path, Marker.DOWNLOAD_IN_PROGRESS_MARKER)
+                }
+
+                if (game != null) {
+                    val updatedGame = game.copy(isInstalled = false, installPath = "")
+                    itchGameDao.update(updatedGame)
+                    Timber.d("Updated database: game marked as not installed")
+                }
+
+                withContext(Dispatchers.Main) {
+                    ContainerUtils.deleteContainer(context, libraryItem.appId)
+                }
+
+                // Trigger library refresh event
+                app.gamenative.PluviaApp.events.emitJava(
+                    app.gamenative.events.AndroidEvent.LibraryInstallStatusChanged(libraryItem.gameId, app.gamenative.data.GameSource.ITCH),
+                )
+
+                if (failedPaths.isNotEmpty()) {
+                    return@withContext Result.failure(Exception("Failed to fully delete at: ${failedPaths.joinToString()}"))
+                }
+
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to delete Itch game ${libraryItem.gameId}")
+                Result.failure(e)
+            }
+        }
     }
 }
