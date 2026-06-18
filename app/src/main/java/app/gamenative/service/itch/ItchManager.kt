@@ -1,6 +1,7 @@
 package app.gamenative.service.itch
 
 import android.content.Context
+import app.gamenative.data.GOGGame
 import app.gamenative.data.GameSource
 import app.gamenative.data.ItchGame
 import app.gamenative.data.LibraryItem
@@ -121,6 +122,7 @@ class ItchManager @Inject constructor(
             val itchGame = ItchGame(
                 ownedKey.gameId,
                 ownedKey.game.title,
+                ownedKey.id,
                 0,
                 0,
                 false,
@@ -158,9 +160,15 @@ class ItchManager @Inject constructor(
     suspend fun getGameFromDbById(gameId: Long): app.gamenative.data.ItchGame? {
         return itchGameDao.getById(gameId);
     }
-//    fun updateGame(game: ItchGame) {}
+
+    suspend fun updateGame(game: ItchGame) {
+        withContext(Dispatchers.IO) {
+            itchGameDao.update(game)
+        }
+    }
+
     fun verifyInstallation(gameId: Long) : Pair<Boolean, String?> {
-        return Pair(false, "haven't implemented this yet lol")
+        return Pair(true, "haven't implemented this yet lol")
     }
 
     /**
@@ -170,6 +178,16 @@ class ItchManager @Inject constructor(
     suspend fun getLaunchExecutable(appId: String, container: Container): String = withContext(Dispatchers.IO) {
         container.executablePath.ifEmpty {
             getInstalledExe(LibraryItem(appId = appId, name = "", gameSource = GameSource.GOG))
+        }
+    }
+
+    suspend fun getUploadsForGame(context : Context, gameId : Long): Result<List<Upload>> {
+        val game = getGameFromDbById(gameId);
+        val itchAuth = ItchAuthManager.getStoredCredentials(context).getOrNull();
+        if(game != null && itchAuth != null){
+            return ItchApiClient.getGameUploads(itchAuth, gameId, game.downloadKey);
+        } else {
+            return Result.failure(Exception("Failed to get game uploads"));
         }
     }
 

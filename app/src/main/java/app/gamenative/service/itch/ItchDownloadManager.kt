@@ -1,22 +1,216 @@
 package app.gamenative.service.itch
 
 import android.content.Context
+import android.net.Uri
+import app.gamenative.data.DownloadInfo
+import app.gamenative.data.ItchGame
+import app.gamenative.enums.Marker
+import app.gamenative.utils.FileUtils.calculateDirectorySize
+import app.gamenative.utils.MarkerUtils
+import app.gamenative.utils.Net
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.Request
+import timber.log.Timber
+import java.io.BufferedOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.security.DigestOutputStream
+import java.security.MessageDigest
+import java.util.concurrent.CopyOnWriteArrayList
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private val httpClient = Net.http
+
 
 @Singleton
 class ItchDownloadManager @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val itchManager: ItchManager
 ) {
-    fun downloadGame(
-        gameId: String,
-        file: java.io.File,
-        downloadInfo: app.gamenative.data.DownloadInfo,
-        containerLanguage: String,
-        bool: Boolean,
-        commonRedistDir: java.io.File,
-    ) : Result<Unit> {
-        return Result.failure(Exception("not implemented yet"))
+//    suspend fun downloadGame(
+//        game: ItchGame,
+//        upload: Upload,
+//        apiKey: String,
+//        file: File
+//    ) : Result<DownloadInfo> {
+//        try {
+//            Timber.tag("itch");
+//
+//            Timber.i("Starting download for ${game.title}")
+//
+//            val downloadRequest = ItchApiClient.getDownloadUrl(upload.id, game.downloadKey, apiKey);
+//            val downloadResponse = withContext(Dispatchers.IO){
+//                httpClient.newCall(downloadRequest).execute()
+//            }.use { response ->
+//
+//                if(response.isSuccessful == false){
+//                    Timber.i("Download failed for ${game.title}")
+//                    return Result.failure(Exception("Failed to download"));
+//                }
+//
+//                Timber.i("Successful download for ${game.title}")
+//
+//                val downloadStream = response.body.byteStream()
+//                var fileOutputStream = FileOutputStream(file);
+//                downloadStream.copyTo(fileOutputStream);
+//                fileOutputStream.flush()
+//                fileOutputStream.close()
+//
+//                Timber.i("Download ${game.title} written to ${file.toURI()}")
+//
+//                return Result.success(DownloadInfo(1,game.id.toInt(), CopyOnWriteArrayList()));
+//            }
+//
+//        } catch (e: Exception) {
+//            return Result.failure(Exception("Failed to download - ${e.message}"));
+//        }
+//    }
+
+    suspend fun downloadGame(
+        game: ItchGame,
+        upload: Upload,
+        apiKey: String,
+        file: File,
+        downloadInfo : DownloadInfo
+    ): Result<Unit> {
+        try {
+            downloadGameUpload(game, upload, apiKey, file, downloadInfo).getOrThrow();
+            finalizeInstallSuccess(game.id, file, downloadInfo);
+            return Result.success(Unit)
+        } catch (e: Exception) {
+            return Result.failure(e);
+        }
+    }
+
+    fun downloadGameUpload(
+        game: ItchGame,
+        upload: Upload,
+        apiKey: String,
+        file: File,
+        downloadInfo : DownloadInfo
+    ): Result<Unit> {
+        //val file = f.file
+        //val outFile = File(baseDir, file.path)
+        //outFile.parentFile?.mkdirs()
+
+//        if (file.size == 0L) {
+//            outFile.createNewFile()
+//            return Result.success(Unit)
+//        }
+
+        downloadInfo.updateStatusMessage("Fetching builds...");
+
+        val downloadRequest = ItchApiClient.getDownloadUrl(upload.id, game.downloadKey, apiKey);
+
+            //?: return Result.failure(Exception("No main.bin URL for product ${f.productId}"))
+
+//        val offset = 0;//file.offset
+//        if (offset == null) {
+//            return Result.failure(Exception("Gen 1 file ${file.path} has no offset (main.bin range request required)"))
+//        }
+
+//        val rangeHeader = "bytes=$offset-${offset + file.size - 1}"
+//        val request = Request.Builder()
+//            .url(mainBinUrl)
+//            .header("User-Agent", "GOG Galaxy")
+//            .header("Range", rangeHeader)
+//            .build()
+
+        downloadInfo.updateStatusMessage("Starting download...");
+        downloadInfo.setTotalExpectedBytes(upload.size);
+
+        return try {
+            Net.http.newCall(downloadRequest).execute().use { response ->
+                if (!response.isSuccessful) return Result.failure(Exception("HTTP ${response.code} for ${file.path}"))
+                val body = response.body ?: return Result.failure(Exception("Empty response"))
+                val md = MessageDigest.getInstance("MD5")
+                val buffer = ByteArray(256 * 1024) // 256KB
+                val progressInterval = 512L * 1024 // emit progress every 512KB
+                var copiedInFile = 0L
+
+                downloadInfo.updateStatusMessage("Downloading...");
+                downloadInfo.emitProgressChange();
+
+                DigestOutputStream(
+                    BufferedOutputStream(FileOutputStream(file)),
+                    md
+                ).use { out ->
+                    body.byteStream().use { input ->
+                        var n: Int
+                        while (input.read(buffer).also { n = it } != -1) {
+                            if (!downloadInfo.isActive()) {
+                                file.delete()
+                                return Result.failure(Exception("Download cancelled"))
+                            }
+                            out.write(buffer, 0, n)
+                            copiedInFile += n
+                            downloadInfo.updateBytesDownloaded(n.toLong())
+                            if (copiedInFile >= progressInterval || downloadInfo.getBytesDownloaded() >= upload.size) {
+                                copiedInFile = 0L
+                                Timber.tag("Itch").i("Download at ${downloadInfo.getBytesDownloaded()} of ${upload.size}");
+                                downloadInfo.setProgress(
+                                    (downloadInfo.getBytesDownloaded().toFloat() / upload.size).coerceIn(0f, 1f)
+                                )
+                                downloadInfo.emitProgressChange()
+                            }
+                        }
+                    }
+                }
+                val bytesWritten = file.length()
+                if (bytesWritten != upload.size) return Result.failure(Exception("Size mismatch ${file.path}"))
+                val md5 = md.digest().joinToString("") { "%02x".format(it) }
+//                if (file.hash.isNotEmpty() && md5 != file.hash) return Result.failure(Exception("MD5 mismatch ${file.path}"))
+                // bytes already reported during copy; ensure final progress is exact
+                downloadInfo.setProgress(
+                    (downloadInfo.getBytesDownloaded().toFloat() / upload.size).coerceIn(0f, 1f)
+                )
+                downloadInfo.emitProgressChange()
+                Result.success(Unit)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Shared finalization after a successful install: update DB, set download complete, emit events.
+     * Used by both Gen 2 and Gen 1 success paths.
+     */
+    private suspend fun finalizeInstallSuccess(gameId: Long, installPath: File, downloadInfo: DownloadInfo) {
+        downloadInfo.updateStatusMessage("Updating database...")
+        try {
+            val game = itchManager.getGameFromDbById(gameId)
+            if (game != null) {
+                val installSize = calculateDirectorySize(installPath)
+                itchManager.updateGame(game.copy(isInstalled = true, installPath = installPath.absolutePath, installSize = installSize))
+                downloadInfo.clearPersistedBytesDownloaded(installPath.absolutePath)
+                Timber.tag("itch").i("Updated database: game marked as installed, size: ${installSize / 1_000_000} MB")
+            } else {
+                Timber.tag("itch").w("Game $gameId not found in database, skipping DB update")
+            }
+        } catch (e: Exception) {
+            Timber.tag("itch").e(e, "Failed to update database for game $gameId")
+        }
+        downloadInfo.updateStatusMessage("Complete")
+        downloadInfo.setProgress(1.0f)
+        downloadInfo.setActive(false)
+        downloadInfo.emitProgressChange()
+        MarkerUtils.removeMarker(installPath.absolutePath, Marker.DOWNLOAD_IN_PROGRESS_MARKER)
+        MarkerUtils.addMarker(installPath.absolutePath, Marker.DOWNLOAD_COMPLETE_MARKER)
+        app.gamenative.PluviaApp.events.emitJava(
+            app.gamenative.events.AndroidEvent.DownloadStatusChanged(gameId.toInt(), false),
+        )
+        app.gamenative.PluviaApp.events.emitJava(
+            app.gamenative.events.AndroidEvent.LibraryInstallStatusChanged(gameId.toInt(), app.gamenative.data.GameSource.ITCH),
+        )
+    }
+
+    private sealed class DownloadState {
+        data class Downloading(val progress: Int) : DownloadState()
+        object Finished : DownloadState()
+        object Failed : DownloadState()
     }
 }

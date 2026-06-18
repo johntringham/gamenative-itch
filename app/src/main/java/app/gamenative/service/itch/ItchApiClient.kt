@@ -66,25 +66,25 @@ data class User(
 @Serializable
 data class Upload(
     @SerialName("channel_name")
-    val channelName: String,
-    val position: Long,
+    val channelName: String? = null,
+    val position: Long? = null,
     @SerialName("game_id")
     val gameId: Long,
     @SerialName("created_at")
-    val createdAt: String,
+    val createdAt: String? = null,
     @SerialName("display_name")
-    val displayName: String,
-    val traits: List<String>,
-    val filename: String,
+    val displayName: String? = null,
+    val traits: List<String>?= null,
+    val filename: String?= null,
     @SerialName("build_id")
-    val buildId: Long,
+    val buildId: Long?= null,
     val size: Long,
     @SerialName("updated_at")
-    val updatedAt: String,
-    val build: Build,
+    val updatedAt: String?= null,
+    val build: Build?= null,
     val id: Long,
-    val type: String,
-    val storage: String,
+    val type: String?,
+    val storage: String?,
 )
 
 @Serializable
@@ -92,18 +92,18 @@ data class Build(
     @SerialName("upload_id")
     val uploadId: Long,
     @SerialName("created_at")
-    val createdAt: String,
-    val state: String,
+    val createdAt: String?= null,
+    val state: String?= null,
     @SerialName("user_id")
-    val userId: Long,
+    val userId: Long?= null,
     @SerialName("updated_at")
-    val updatedAt: String,
+    val updatedAt: String?= null,
     val id: Long,
-    val version: Long,
+    val version: Long?= null,
     @SerialName("game_id")
     val gameId: Long,
     @SerialName("parent_build_id")
-    val parentBuildId: Long,
+    val parentBuildId: Long?= null,
 )
 
 
@@ -170,15 +170,21 @@ object ItchApiClient {
         }
     }
 
-    public suspend fun getGameUploads(auth : ItchAuth, ownedKey: OwnedKey) : Result<List<Upload>>
+    public suspend fun getGameUploads(auth : ItchAuth, gameId : Long, downloadKeyId : Long) : Result<List<Upload>>
     {
         try {
-            val url = "$apiUrlRoot/games/${ownedKey.gameId}/uploads?download_key_id=${ownedKey.id}".toHttpUrl();
+            val url = "$apiUrlRoot/games/$gameId/uploads?download_key_id=$downloadKeyId".toHttpUrl();
             val response = makeApiCall<UploadsResponse>(auth, url).getOrThrow();
             return Result.success(response.uploads);
         } catch (e : Exception) {
-            return Result.failure(Exception("Failed to get game uploads"))
+            return Result.failure(Exception("Failed to get game uploads - ${e.message}"))
         }
+    }
+
+    public fun getDownloadUrl(uploadId : Long, downloadKey : Long, apiKey : String): Request {
+        val url = "$apiUrlRoot/uploads/$uploadId/download?download_key_id=$downloadKey&api_key=$apiKey"
+        val request = Request.Builder().url(url).get().build();
+        return request;
     }
 
     private suspend inline fun <reified TResponse> makeApiCall(

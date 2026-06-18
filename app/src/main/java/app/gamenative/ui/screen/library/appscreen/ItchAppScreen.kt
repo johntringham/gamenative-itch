@@ -20,7 +20,7 @@ import app.gamenative.data.ItchGame
 import app.gamenative.data.LibraryItem
 import app.gamenative.events.AndroidEvent
 import app.gamenative.service.DownloadService
-import app.gamenative.service.gog.GOGConstants
+import app.gamenative.service.itch.ItchConstants
 import app.gamenative.service.itch.ItchService
 import app.gamenative.ui.component.dialog.MessageDialog
 import app.gamenative.ui.component.dialog.state.MessageDialogState
@@ -34,15 +34,12 @@ import com.winlator.container.ContainerData
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import app.gamenative.ui.util.SnackbarManager
 import app.gamenative.utils.ContainerUtils
 import app.gamenative.utils.DateTimeUtils
 import app.gamenative.utils.StorageUtils
 import timber.log.Timber
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
 
 /**
  * Itch-specific implementation of BaseAppScreen
@@ -261,7 +258,7 @@ class ItchAppScreen : BaseAppScreen() {
                 // Calculate sizes
                 val downloadSize = StorageUtils.formatBinarySize(game?.downloadSize ?: 0L)
                 val availableSpace = StorageUtils.formatBinarySize(
-                    StorageUtils.getAvailableSpace(GOGConstants.defaultGOGGamesPath)
+                    StorageUtils.getAvailableSpace(ItchConstants.defaultItchGamesPath(context))
                 )
 
                 val message = context.getString(
@@ -285,31 +282,31 @@ class ItchAppScreen : BaseAppScreen() {
     }
 
     private fun performDownload(context: Context, libraryItem: LibraryItem, onClickPlay: (Boolean) -> Unit) {
-        val gameId = libraryItem.gameId.toString()
-        Timber.i("Starting GOG game download: ${libraryItem.appId}")
+        val gameId = libraryItem.gameId;
+        Timber.i("Starting Itch game download: ${libraryItem.appId}")
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 // Get install path
-                val installPath = GOGConstants.getGameInstallPath(libraryItem.name)
+                val installPath = ItchConstants.getGameInstallPath(context, libraryItem.name)
                 val containerData = loadContainerData(context, libraryItem)
 
-                Timber.d("Downloading GOG game to: $installPath")
+                Timber.d("Downloading Itch game to: $installPath")
 
                 SnackbarManager.show("Starting download for ${libraryItem.name}...")
 
                 // Start download - ItchService will handle monitoring, database updates, verification, and events
-                val result = ItchService.downloadGame(context, gameId, installPath, containerData.language)
+                val result = ItchService.downloadGame(context, gameId.toLong(), installPath, containerData.language)
 
                 if (result.isSuccess) {
-                    Timber.i("GOG download started successfully for: $gameId")
+                    Timber.i("Itch download started successfully for: $gameId")
                     // Success toast will be shown when download completes (monitored by ItchService)
                 } else {
                     val error = result.exceptionOrNull()
-                    Timber.e(error, "Failed to start GOG download")
+                    Timber.e(error, "Failed to start Itch download")
                     SnackbarManager.show("Failed to start download: ${error?.message}")
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Error during GOG download")
+                Timber.e(e, "Error during Itch download")
                 SnackbarManager.show("Download error: ${e.message}")
             }
         }
@@ -323,11 +320,11 @@ class ItchAppScreen : BaseAppScreen() {
         val hasPartial = hasPartialDownload(context, libraryItem)
 
         if (isDownloading) {
-            Timber.tag(TAG).i("Cancelling GOG download: ${libraryItem.appId}")
+            Timber.tag(TAG).i("Cancelling Itch download: ${libraryItem.appId}")
             downloadInfo?.cancel()
             ItchService.cleanupDownload(gameId)
         } else if (hasPartial) {
-            Timber.tag(TAG).i("Resuming partial GOG download via pause/resume: ${libraryItem.appId}")
+            Timber.tag(TAG).i("Resuming partial Itch download via pause/resume: ${libraryItem.appId}")
             performDownload(context, libraryItem) {}
         } else {
             // Fresh start: show install confirmation dialog.
@@ -360,23 +357,23 @@ class ItchAppScreen : BaseAppScreen() {
     }
 
     private fun performUninstall(context: Context, libraryItem: LibraryItem) {
-        Timber.i("Uninstalling GOG game: ${libraryItem.appId}")
+        Timber.i("Uninstalling Itch game: ${libraryItem.appId}")
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Delegate to ItchService which calls GOGManager.deleteGame
+                // Delegate to ItchService which calls ItchManager.deleteGame
                 val result = ItchService.deleteGame(context, libraryItem)
                 DownloadService.invalidateCache()
 
                 if (result.isSuccess) {
-                    Timber.i("Successfully uninstalled GOG game: ${libraryItem.appId}")
+                    Timber.i("Successfully uninstalled Itch game: ${libraryItem.appId}")
                     SnackbarManager.show("Game uninstalled successfully")
                 } else {
                     val error = result.exceptionOrNull()
-                    Timber.e(error, "Failed to uninstall GOG game: ${libraryItem.appId}")
+                    Timber.e(error, "Failed to uninstall Itch game: ${libraryItem.appId}")
                     SnackbarManager.show("Failed to uninstall game: ${error?.message}")
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Error uninstalling GOG game")
+                Timber.e(e, "Error uninstalling Itch game")
                 SnackbarManager.show("Failed to uninstall game: ${e.message}")
             }
         }
@@ -384,13 +381,13 @@ class ItchAppScreen : BaseAppScreen() {
 
     override fun onUpdateClick(context: Context, libraryItem: LibraryItem) {
         Timber.tag(TAG).i("onUpdateClick: appId=${libraryItem.appId}")
-        // TODO: Implement update for GOG games
-        // Check GOG for newer version and download if available
-        Timber.tag(TAG).d("Update clicked for GOG game: ${libraryItem.appId}")
+        // TODO: Implement update for Itch games
+        // Check Itch for newer version and download if available
+        Timber.tag(TAG).d("Update clicked for Itch game: ${libraryItem.appId}")
     }
 
     override fun getExportFileExtension(): String {
-        return ".gog"
+        return ".Itch"
     }
 
     override fun getInstallPath(context: Context, libraryItem: LibraryItem): String? {
@@ -408,7 +405,7 @@ class ItchAppScreen : BaseAppScreen() {
 
     override fun loadContainerData(context: Context, libraryItem: LibraryItem): ContainerData {
         Timber.tag(TAG).d("loadContainerData: appId=${libraryItem.appId}")
-        // Load GOG-specific container data using ContainerUtils
+        // Load Itch-specific container data using ContainerUtils
         val container = ContainerUtils.getOrCreateContainer(context, libraryItem.appId)
         val containerData = ContainerUtils.toContainerData(container)
         Timber.tag(TAG).d("loadContainerData: loaded container for ${libraryItem.appId}")
@@ -423,26 +420,26 @@ class ItchAppScreen : BaseAppScreen() {
         Timber.tag(TAG).d("saveContainerConfig: saved container config for ${libraryItem.appId}")
 
         if (previousLanguage != config.language) {
-            triggerGOGVerifyDownload(context, libraryItem, config.language)
+            triggerItchVerifyDownload(context, libraryItem, config.language)
         }
     }
 
-    private fun triggerGOGVerifyDownload(context: Context, libraryItem: LibraryItem, language: String) {
+    private fun triggerItchVerifyDownload(context: Context, libraryItem: LibraryItem, language: String) {
         CoroutineScope(Dispatchers.IO).launch {
             val gameId = libraryItem.gameId.toString()
             if (!ItchService.isGameInstalled(gameId.toLong())) return@launch
             if (ItchService.getDownloadInfo(gameId)?.isActive() == true) return@launch
 
             val installPath = ItchService.getInstallPath(gameId.toLong())
-                ?: GOGConstants.getGameInstallPath(libraryItem.name)
+                ?: ItchConstants.getGameInstallPath(context, libraryItem.name)
 
-            ItchService.downloadGame(context, gameId, installPath, language)
+            ItchService.downloadGame(context, gameId.toLong(), installPath, language)
         }
     }
 
     override fun supportsContainerConfig(): Boolean {
         Timber.tag(TAG).d("supportsContainerConfig: returning true")
-        // GOG games support container configuration like other Wine games
+        // Itch games support container configuration like other Wine games
         return true
     }
 
@@ -484,7 +481,7 @@ class ItchAppScreen : BaseAppScreen() {
     }
 
     /**
-     * GOG games support standard container reset
+     * Itch games support standard container reset
      */
     @Composable
     override fun getResetContainerOption(
@@ -584,7 +581,7 @@ class ItchAppScreen : BaseAppScreen() {
     }
 
     /**
-     * GOG-specific dialogs (install confirmation, uninstall confirmation)
+     * Itch-specific dialogs (install confirmation, uninstall confirmation)
      */
     @Composable
     override fun AdditionalDialogs(
@@ -668,10 +665,10 @@ class ItchAppScreen : BaseAppScreen() {
                         hideInstallDialog(appId)
                         val gameId = libraryItem.gameId.toString()
                         val installPath = ItchService.getInstallPath(gameId.toLong())
-                            ?: GOGConstants.getGameInstallPath(libraryItem.name)
+                            ?: ItchConstants.getGameInstallPath(context, libraryItem.name)
                         MarkerUtils.clearInstalledPrerequisiteMarkers(installPath)
                         val language = loadContainerData(context, libraryItem).language
-                        triggerGOGVerifyDownload(context, libraryItem, language)
+                        triggerItchVerifyDownload(context, libraryItem, language)
                     }
                 }
                 else -> null
@@ -694,11 +691,11 @@ class ItchAppScreen : BaseAppScreen() {
                 onDismissRequest = {
                     hideUninstallDialog(libraryItem.appId)
                 },
-                title = { Text(stringResource(R.string.gog_uninstall_game_title)) },
+                title = { Text(stringResource(R.string.itch_uninstall_game_title)) },
                 text = {
                     Text(
                         text = stringResource(
-                            R.string.gog_uninstall_confirmation_message,
+                            R.string.itch_uninstall_confirmation_message,
                             libraryItem.name,
                         ),
                     )

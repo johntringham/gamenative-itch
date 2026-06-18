@@ -9,9 +9,13 @@ import app.gamenative.PluviaApp
 import app.gamenative.data.DownloadInfo
 import app.gamenative.data.ItchGame
 import app.gamenative.data.LibraryItem
+import app.gamenative.db.dao.ItchGameDao
 import app.gamenative.events.AndroidEvent
 import app.gamenative.service.NotificationHelper
+import app.gamenative.ui.util.SnackbarManager
+import app.gamenative.utils.ContainerUtils
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -24,6 +28,7 @@ import timber.log.Timber
 import java.io.File
 import java.nio.file.Paths
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import javax.inject.Inject
 
 
@@ -346,100 +351,91 @@ class ItchService : Service() {
                 ?: Result.failure(Exception("Service not available"))
         }
 
-        fun downloadGame(context: Context, gameId: String, installPath: String, containerLanguage: String): Result<DownloadInfo?> {
-//            val instance = getInstance() ?: return Result.failure(Exception("Service not available"))
-//
-//            // Create DownloadInfo for progress tracking
-//            val downloadInfo = DownloadInfo(jobCount = 1, gameId = 0, downloadingAppIds = CopyOnWriteArrayList<Int>())
-//            downloadInfo.setPersistencePath(installPath)
-//
-//            val persistedBytes = downloadInfo.loadPersistedBytesDownloaded(installPath)
-//            if (persistedBytes > 0L) {
-//                downloadInfo.initializeBytesDownloaded(persistedBytes)
-//            }
-//
-//            // Track in activeDownloads first
-//            instance.activeDownloads[gameId] = downloadInfo
-//
-//            // Launch download in service scope so it runs independently
-//            val job = instance.scope.launch {
-//                try {
-//                    Timber.d("[Download] Starting download for game $gameId")
-//                    val commonRedistDir = File(installPath, "_CommonRedist")
-//                    Timber.tag("itch").d("Will install dependencies to _CommonRedist")
-//
-//                    val result = instance.itchDownloadManager.downloadGame(
-//                        gameId, File(installPath),
-//                        downloadInfo, containerLanguage, true, commonRedistDir,
-//                    )
-//
-//                    if (result.isFailure) {
-//                        val error = result.exceptionOrNull()
-//                        Timber.e(error, "[Download] Failed for game $gameId")
-//                        downloadInfo.setProgress(-1.0f)
-//                        downloadInfo.setActive(false)
-//
-//                        SnackbarManager.show("Download failed: ${error?.message ?: "Unknown error"}")
-//                    } else {
-//                        Timber.i("[Download] Completed successfully for game $gameId")
-//
-//                        // Download cloud saves so they're ready before first launch.
-//                        // Status message keeps isDownloading() true so Play stays hidden during sync.
-//                        val appId = "ITCH_$gameId"
-//                        val numericGameId = gameId.toIntOrNull()
-//                        try {
-//                            val ItchGame = instance.itchManager.getGameFromDbById(gameId)
-//                            val locations = if (ItchGame != null) instance.itchManager.getSaveDirectoryPath(context, appId, ItchGame.title) else null
-//                            if (numericGameId != null && !locations.isNullOrEmpty() && !ContainerUtils.isLocalSavesOnly(context, appId)) {
-//                                try {
-//                                    downloadInfo.setPostInstallSyncing(true)
-//                                    PluviaApp.events.emit(AndroidEvent.PostInstallSyncStatusChanged(numericGameId, true))
-//                                    downloadInfo.updateStatusMessage("Syncing saves...")
-//                                    syncCloudSaves(context, appId, preferredAction = "download")
-//                                } catch (e: CancellationException) {
-//                                    throw e
-//                                } catch (e: Exception) {
-//                                    Timber.e(e, "[PostInstallSync] Cloud save sync failed for game $gameId")
-//                                } finally {
-//                                    downloadInfo.setPostInstallSyncing(false)
-//                                    downloadInfo.updateStatusMessage(null)
-//                                    PluviaApp.events.emit(AndroidEvent.PostInstallSyncStatusChanged(numericGameId, false))
-//                                }
-//                            }
-//                        } catch (e: CancellationException) {
-//                            throw e
-//                        } catch (e: Exception) {
-//                            Timber.e(e, "[PostInstallSync] Cloud save sync failed for game $gameId")
-//                        }
-//
-//                        SnackbarManager.show("Download completed successfully!")
-//                        downloadInfo.setProgress(1.0f)
-//                        downloadInfo.setActive(false)
-//                    }
-//                } catch (e: CancellationException) {
-//                    downloadInfo.setPostInstallSyncing(false)
-//                    downloadInfo.updateStatusMessage(null)
-//                    PluviaApp.events.emit(AndroidEvent.PostInstallSyncStatusChanged(gameId.toIntOrNull() ?: -1, false))
-//                    throw e
-//                } catch (e: Exception) {
-//                    Timber.e(e, "[Download] Exception for game $gameId")
-//                    downloadInfo.setPostInstallSyncing(false)
-//                    downloadInfo.updateStatusMessage(null)
-//                    PluviaApp.events.emit(AndroidEvent.PostInstallSyncStatusChanged(gameId.toIntOrNull() ?: -1, false))
-//                    downloadInfo.setProgress(-1.0f)
-//                    downloadInfo.setActive(false)
-//
-//                    SnackbarManager.show("Download error: ${e.message ?: "Unknown error"}")
-//                } finally {
-//                    // Remove from activeDownloads for both success and failure
-//                    // so UI knows download is complete and to prevent stale entries
-//                    instance.activeDownloads.remove(gameId)
-//                    Timber.d("[Download] Finished for game $gameId, progress: ${downloadInfo.getProgress()}, active: ${downloadInfo.isActive()}")
-//                }
-//            }
-//            downloadInfo.setDownloadJob(job)
+        suspend fun downloadGame(context: Context, gameId: Long, installPath: String, containerLanguage: String): Result<DownloadInfo?> {
+            val instance = getInstance() ?: return Result.failure(Exception("Service not available"))
 
-            return Result.failure(Exception("haven't implemented this yet"))
+            val manager = instance.itchManager;
+            // Create DownloadInfo for progress tracking
+            val downloadInfo = DownloadInfo(jobCount = 1, gameId = 0, downloadingAppIds = CopyOnWriteArrayList<Int>())
+            downloadInfo.setPersistencePath(installPath)
+
+            val persistedBytes = downloadInfo.loadPersistedBytesDownloaded(installPath)
+            if (persistedBytes > 0L) {
+                downloadInfo.initializeBytesDownloaded(persistedBytes)
+            }
+
+            val itchGame = manager.getGameFromDbById(gameId.toLong())
+            if(itchGame == null){
+                return Result.failure(Exception("Can't find game in database"));
+            }
+
+            // Track in activeDownloads first
+            instance.activeDownloads[gameId.toString()] = downloadInfo
+
+            // Launch download in service scope so it runs independently
+            val job = instance.scope.launch {
+                try {
+
+                    val uploads = manager.getUploadsForGame(context, gameId).getOrThrow();
+                    val windowsUploads = uploads.filter { it.channelName == "win" }; // builds could be linux or mac or etc - we just care about windows
+                    // todo: make this properly selectable, as there might be multiple windows downloads, or it might not be labelled correctly
+
+                    Timber.i("${windowsUploads.count()} windows downloads found for itch game $gameId");
+
+                    if(windowsUploads.isEmpty()){
+                        Timber.i("No windows downloads found for itch game $gameId");
+                        throw Exception("No windows builds found");
+                    }
+
+                    Timber.i("Found ${windowsUploads.count()} windows uploads");
+
+                    Timber.d("[Download] Starting download for game $gameId")
+                    val commonRedistDir = File(installPath, "_CommonRedist")
+                    Timber.tag("itch").d("Will install dependencies to _CommonRedist")
+
+                    val uploadToDownload = windowsUploads.first();
+                    val apiKey = ItchAuthManager.getStoredCredentials(context).getOrNull()?.apiKey ?: "";
+
+                    val result = instance.itchDownloadManager.downloadGame(
+                        itchGame, uploadToDownload, apiKey, File(installPath), downloadInfo
+                    )
+
+                    if (result.isFailure) {
+                        val error = result.exceptionOrNull()
+                        Timber.e(error, "[Download] Failed for game $gameId")
+                        downloadInfo.setProgress(-1.0f)
+                        downloadInfo.setActive(false)
+                        SnackbarManager.show("Download failed: ${error?.message ?: "Unknown error"}")
+                    } else {
+                        Timber.i("[Download] Completed successfully for game $gameId")
+                        SnackbarManager.show("Download completed successfully!")
+                        downloadInfo.setProgress(1.0f)
+                        downloadInfo.setActive(false)
+                    }
+                } catch (e: CancellationException) {
+                    downloadInfo.setPostInstallSyncing(false)
+                    downloadInfo.updateStatusMessage(null)
+                    PluviaApp.events.emit(AndroidEvent.PostInstallSyncStatusChanged(gameId.toInt() ?: -1, false))
+                    throw e
+                } catch (e: Exception) {
+                    Timber.e(e, "[Download] Exception for game $gameId")
+                    downloadInfo.setPostInstallSyncing(false)
+                    downloadInfo.updateStatusMessage(null)
+                    PluviaApp.events.emit(AndroidEvent.PostInstallSyncStatusChanged(gameId.toInt() ?: -1, false))
+                    downloadInfo.setProgress(-1.0f)
+                    downloadInfo.setActive(false)
+
+                    SnackbarManager.show("Download error: ${e.message ?: "Unknown error"}")
+                } finally {
+                    // Remove from activeDownloads for both success and failure
+                    // so UI knows download is complete and to prevent stale entries
+                    instance.activeDownloads.remove(gameId.toString())
+                    Timber.d("[Download] Finished for game $gameId, progress: ${downloadInfo.getProgress()}, active: ${downloadInfo.isActive()}")
+                }
+            }
+            downloadInfo.setDownloadJob(job)
+
+            return Result.success(downloadInfo)
         }
 
 
