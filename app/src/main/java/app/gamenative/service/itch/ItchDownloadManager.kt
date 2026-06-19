@@ -1,7 +1,6 @@
 package app.gamenative.service.itch
 
 import android.content.Context
-import android.net.Uri
 import app.gamenative.data.DownloadInfo
 import app.gamenative.data.ItchGame
 import app.gamenative.enums.Marker
@@ -9,16 +8,14 @@ import app.gamenative.utils.FileUtils.calculateDirectorySize
 import app.gamenative.utils.MarkerUtils
 import app.gamenative.utils.Net
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.Request
 import timber.log.Timber
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.security.DigestOutputStream
 import java.security.MessageDigest
-import java.util.concurrent.CopyOnWriteArrayList
+import java.util.zip.ZipFile
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -73,25 +70,72 @@ class ItchDownloadManager @Inject constructor(
         game: ItchGame,
         upload: Upload,
         apiKey: String,
-        file: File,
+        installFolder: File,
         downloadInfo : DownloadInfo
     ): Result<Unit> {
         try {
-            downloadGameUpload(game, upload, apiKey, file, downloadInfo).getOrThrow();
-            finalizeInstallSuccess(game.id, file, downloadInfo);
+            val file = downloadGameUpload(game, upload, apiKey, installFolder, downloadInfo).getOrThrow();
+            unarchiveFile(file);
+            finalizeInstallSuccess(game.id, installFolder, downloadInfo);
             return Result.success(Unit)
         } catch (e: Exception) {
             return Result.failure(e);
         }
     }
 
+    private fun unarchiveFile(file: File) {
+//        file.listFiles().forEach {
+
+
+            val extension = file.extension;
+
+            when (extension) {
+                "zip" -> {
+                    extractZipContents(file, file.parentFile ?: file);
+                }
+
+                else -> {}
+            }
+
+//        }
+    }
+
+    private fun extractZipContents(fileFile: File, dest : File) {
+        ZipFile(fileFile.path).use {
+            zip ->
+            zip.entries().asSequence().forEach { entry ->
+                val inputStream = zip.getInputStream(entry);
+                inputStream.use { stream ->
+                    val path = dest.path + File.separator + entry.name
+                    val entryFile = File(path);
+                    if(entryFile.isDirectory){
+                        entryFile.mkdirs()
+                    } else {
+                        writeExtractedEntryToFile(inputStream, entryFile);
+                    }
+                }
+            }
+        }
+    }
+
+    private fun writeExtractedEntryToFile(inputStream: InputStream, entryFile: File) {
+        val outputStream = BufferedOutputStream(FileOutputStream(entryFile));
+        val bufferArray = ByteArray(4096);
+        var readBytes = 0;
+        while(inputStream.read(bufferArray).also { readBytes = it } != -1){
+            outputStream.write(bufferArray);
+        }
+
+        outputStream.close()
+    }
+
     fun downloadGameUpload(
         game: ItchGame,
         upload: Upload,
         apiKey: String,
-        file: File,
+        folder: File,
         downloadInfo : DownloadInfo
-    ): Result<Unit> {
+    ): Result<File> {
         //val file = f.file
         //val outFile = File(baseDir, file.path)
         //outFile.parentFile?.mkdirs()
@@ -119,6 +163,20 @@ class ItchDownloadManager @Inject constructor(
 //            .header("Range", rangeHeader)
 //            .build()
 
+        val mkDirs = folder.mkdirs();
+        val exists = folder.exists()
+        val isDirectory = folder.isDirectory();
+        var file = File(folder.path + File.separator + upload.filename);
+        val fileExists = file.exists()
+
+        val fileCreated = file.createNewFile();
+
+        if(!mkDirs || !fileCreated || !exists || !isDirectory || !fileExists)
+        {
+            Timber.tag("itch").i("wtf");
+        }
+//        folder.mkdirs();
+
         downloadInfo.updateStatusMessage("Starting download...");
         downloadInfo.setTotalExpectedBytes(upload.size);
 
@@ -134,15 +192,14 @@ class ItchDownloadManager @Inject constructor(
                 downloadInfo.updateStatusMessage("Downloading...");
                 downloadInfo.emitProgressChange();
 
-                DigestOutputStream(
-                    BufferedOutputStream(FileOutputStream(file)),
-                    md
-                ).use { out ->
+                val fileOutputStream = FileOutputStream(file);
+                BufferedOutputStream(fileOutputStream)
+                .use { out ->
                     body.byteStream().use { input ->
                         var n: Int
                         while (input.read(buffer).also { n = it } != -1) {
                             if (!downloadInfo.isActive()) {
-                                file.delete()
+                                folder.delete()
                                 return Result.failure(Exception("Download cancelled"))
                             }
                             out.write(buffer, 0, n)
@@ -168,7 +225,7 @@ class ItchDownloadManager @Inject constructor(
                     (downloadInfo.getBytesDownloaded().toFloat() / upload.size).coerceIn(0f, 1f)
                 )
                 downloadInfo.emitProgressChange()
-                Result.success(Unit)
+                Result.success(file)
             }
         } catch (e: Exception) {
             Result.failure(e)
