@@ -377,7 +377,9 @@ class ItchService : Service() {
                 try {
 
                     val uploads = manager.getUploadsForGame(context, gameId).getOrThrow();
-                    val windowsUploads = uploads.filter { it.channelName == "win" }; // builds could be linux or mac or etc - we just care about windows
+
+                    // builds could be linux or mac or etc - we just care about windows
+                    val windowsUploads = uploads.filter { it.channelName == "win" || it.traits?.any { t -> t == "p_windows"} ?: false};
                     // todo: make this properly selectable, as there might be multiple windows downloads, or it might not be labelled correctly
 
                     Timber.i("${windowsUploads.count()} windows downloads found for itch game $gameId");

@@ -13,7 +13,6 @@ import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
-import java.security.DigestOutputStream
 import java.security.MessageDigest
 import java.util.zip.ZipFile
 import javax.inject.Inject
@@ -88,6 +87,7 @@ class ItchDownloadManager @Inject constructor(
 
 
             val extension = file.extension;
+        Timber.tag("itch").i("Unarchiving $file");
 
             when (extension) {
                 "zip" -> {
@@ -100,18 +100,26 @@ class ItchDownloadManager @Inject constructor(
 //        }
     }
 
-    private fun extractZipContents(fileFile: File, dest : File) {
-        ZipFile(fileFile.path).use {
+    private fun extractZipContents(file: File, dest : File) {
+        Timber.tag("itch").i("Unzipping $file");
+
+        ZipFile(file.path).use {
             zip ->
             zip.entries().asSequence().forEach { entry ->
+                Timber.tag("itch").i("Unzipping zip entry $entry");
+
                 val inputStream = zip.getInputStream(entry);
                 inputStream.use { stream ->
                     val path = dest.path + File.separator + entry.name
-                    val entryFile = File(path);
-                    if(entryFile.isDirectory){
-                        entryFile.mkdirs()
-                    } else {
+                    val entryFile = File( path);
+                    entryFile.parentFile?.mkdirs()
+                    if(!entry.isDirectory) {
+
+//                    if(entry.isDirectory){
+//                        Timber.tag("itch").i("Creating zipped directory $entry");
+//                    } else {
                         writeExtractedEntryToFile(inputStream, entryFile);
+//                    }
                     }
                 }
             }
@@ -119,11 +127,14 @@ class ItchDownloadManager @Inject constructor(
     }
 
     private fun writeExtractedEntryToFile(inputStream: InputStream, entryFile: File) {
+        if(entryFile.exists() && entryFile.isDirectory)
+            return;
+
         val outputStream = BufferedOutputStream(FileOutputStream(entryFile));
         val bufferArray = ByteArray(4096);
         var readBytes = 0;
         while(inputStream.read(bufferArray).also { readBytes = it } != -1){
-            outputStream.write(bufferArray);
+            outputStream.write(bufferArray, 0, readBytes);
         }
 
         outputStream.close()
