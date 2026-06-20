@@ -2813,7 +2813,7 @@ fun preLaunchApp(
             return@launch
         }
 
-        if (skipCloudSync || isLocalSavesOnly) {
+        if (skipCloudSync || isLocalSavesOnly || gameSource == GameSource.ITCH) {
             if (isLocalSavesOnly) {
                 Timber.tag("preLaunchApp").i("Local saves only enabled for $appId — skipping Steam Cloud sync")
             } else {

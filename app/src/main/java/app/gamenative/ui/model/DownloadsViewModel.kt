@@ -629,7 +629,7 @@ class DownloadsViewModel @Inject constructor(
 
             GameSource.GOG -> GOGService.cancelDownload(item.appId)
             GameSource.AMAZON -> AmazonService.cancelDownload(item.appId)
-            GameSource.ITCH -> ItchService.cancelDownload(item.appId)            
+                GameSource.ITCH -> ItchService.cancelDownload(item.appId.toLong())
             GameSource.CUSTOM_GAME -> Unit
         }
     }

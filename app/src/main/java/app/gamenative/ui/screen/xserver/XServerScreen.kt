@@ -120,6 +120,7 @@ import app.gamenative.service.rockstar.RockstarLaunchSupport
 import app.gamenative.service.epic.EpicOverlayManager
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
+import app.gamenative.service.itch.ItchService
 import app.gamenative.ui.component.LsfgQuickMenuState
 import app.gamenative.ui.component.PerformanceQuickMenuState
 import app.gamenative.ui.component.QuickMenu
@@ -4749,6 +4750,7 @@ private fun getWineStartCommand(
     val isGOGGame = gameSource == GameSource.GOG
     val isEpicGame = gameSource == GameSource.EPIC
     val isSteamGame = gameSource == GameSource.STEAM
+    val isItchGame = gameSource == GameSource.ITCH
     val gameId = ContainerUtils.extractGameIdFromContainerId(appId)
 
     if (isSteamGame) {
@@ -4796,6 +4798,27 @@ private fun getWineStartCommand(
 
         Timber.tag("XServerScreen").i("GOG launch command: $gogCommand")
         return "winhandler.exe $gogCommand"
+    } else if (isItchGame) {
+        // For Itch games, use ItchService to get the launch command
+        Timber.tag("XServerScreen").i("Launching Itch game: $gameId")
+
+        // Create a LibraryItem from the appId
+        val libraryItem = LibraryItem(
+            appId = appId,
+            name = "", // Name not needed for launch command
+            gameSource = GameSource.ITCH
+        )
+
+        val itchCommand = ItchService.getWineStartCommand(
+            libraryItem = libraryItem,
+            container = container,
+            envVars = envVars,
+            guestProgramLauncherComponent = guestProgramLauncherComponent,
+            gameId = gameId.toLong(),
+        )
+
+        Timber.tag("XServerScreen").i("Itch launch command: $itchCommand")
+        return "winhandler.exe $itchCommand"
     } else if (isEpicGame) {
         // For Epic games, get the launch command
         Timber.tag("XServerScreen").i("Launching Epic game: $gameId")

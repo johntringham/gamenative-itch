@@ -4,6 +4,7 @@ import android.content.Context
 import app.gamenative.data.GOGGame
 import app.gamenative.data.GameSource
 import app.gamenative.data.ItchGame
+import app.gamenative.data.LaunchInfo
 import app.gamenative.data.LibraryItem
 import app.gamenative.db.dao.ItchGameDao
 import app.gamenative.enums.AppType
@@ -12,8 +13,11 @@ import app.gamenative.service.itch.ItchConstants.getGameInstallPath
 import app.gamenative.utils.ContainerUtils
 import app.gamenative.utils.MarkerUtils
 import com.winlator.container.Container
+import com.winlator.core.envvars.EnvVars
+import com.winlator.xenvironment.components.GuestProgramLauncherComponent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
@@ -177,7 +181,7 @@ class ItchManager @Inject constructor(
      */
     suspend fun getLaunchExecutable(appId: String, container: Container): String = withContext(Dispatchers.IO) {
         container.executablePath.ifEmpty {
-            getInstalledExe(LibraryItem(appId = appId, name = "", gameSource = GameSource.GOG))
+            getInstalledExe(LibraryItem(appId = appId, name = "", gameSource = GameSource.ITCH))
         }
     }
 
@@ -195,12 +199,16 @@ class ItchManager @Inject constructor(
     suspend fun getInstalledExe(libraryItem: LibraryItem): String = withContext(Dispatchers.IO) {
         val gameId = libraryItem.gameId.toLong()
         try {
-//            val game = getGameFromDbById(gameId) ?: return@withContext ""
-//            val installPath = getGameInstallPath(context,game.id, game.title)
+            val game = getGameFromDbById(gameId) ?: return@withContext ""
+            val installPath = getGameInstallPath(context,game.title)
+
+            val topLevelExecutables = File(installPath).listFiles { f -> f.extension == "exe" };
+            if(topLevelExecutables?.size == 1){
+                topLevelExecutables[0].name;
+            }else{
 
 //            // todo
 //
-//            // Try V1 structure: goggame-*.info and exe can be in install root or in a subdir
 //            val installDirFile = File(installPath)
 //            val exe = getGameExecutable(installPath, installDirFile)
 //            if (exe.isNotEmpty()) return@withContext exe
@@ -214,6 +222,7 @@ class ItchManager @Inject constructor(
 //            }
 
             ""
+            }
         } catch (e: Exception) {
             Timber.e(e, "Failed to get executable for GOG game $gameId")
             ""
@@ -278,5 +287,92 @@ class ItchManager @Inject constructor(
                 Result.failure(e)
             }
         }
+    }
+
+    fun getWineStartCommand(
+        libraryItem: LibraryItem,
+        container: Container,
+        envVars: EnvVars,
+        guestProgramLauncherComponent: GuestProgramLauncherComponent,
+        gameId: Long,
+    ): String {
+        // Verify installation
+        val (isValid, errorMessage) = verifyInstallation(gameId)
+        if (!isValid) {
+            Timber.e("Installation verification failed: $errorMessage")
+            return "\"explorer.exe\""
+        }
+
+        val game = runBlocking { getGameFromDbById(gameId) }
+        if (game == null) {
+            Timber.e("Game not found for ID: $gameId")
+            return "\"explorer.exe\""
+        }
+
+        val gameInstallPath = getGameInstallPath(context, game.title)
+        val gameDir = File(gameInstallPath)
+
+        if (!gameDir.exists()) {
+            Timber.e("Game directory does not exist: $gameInstallPath")
+            return "\"explorer.exe\""
+        }
+
+        // Use container's configured executable path if available, otherwise auto-detect
+        val executablePath = if (container.executablePath.isNotEmpty()) {
+            Timber.d("Using configured executable path from container: ${container.executablePath}")
+            container.executablePath
+        } else {
+            val detectedPath = runBlocking { getInstalledExe(libraryItem) }
+            Timber.d("Auto-detected executable path: $detectedPath")
+            if (detectedPath.isNotEmpty()) {
+                container.executablePath = detectedPath
+                container.saveData()
+            }
+            detectedPath
+        }
+
+        if (executablePath.isEmpty()) {
+            Timber.w("No executable found, opening file manager")
+            return "\"explorer.exe\""
+        }
+
+        // Find the drive letter that's mapped to this game's install path
+        var itchDriveLetter: String? = null
+        for (drive in com.winlator.container.Container.drivesIterator(container.drives)) {
+            if (drive[1] == gameInstallPath) {
+                itchDriveLetter = drive[0]
+                Timber.d("Found itch game mapped to ${drive[0]}: drive")
+                break
+            }
+        }
+
+        if (itchDriveLetter == null) {
+            Timber.e("itch game directory not mapped to any drive: $gameInstallPath")
+            return "\"explorer.exe\""
+        }
+
+        val gameInstallDir = File(gameInstallPath)
+        val execFile = File(gameInstallPath, executablePath)
+        // Handle potential IllegalArgumentException if paths don't share a common ancestor
+        val relativePath = try {
+            execFile.relativeTo(gameInstallDir).path.replace('/', '\\')
+        } catch (e: IllegalArgumentException) {
+            Timber.e(e, "Failed to compute relative path from $gameInstallDir to $execFile")
+            return "\"explorer.exe\""
+        }
+
+        val windowsPath = "$itchDriveLetter:\\$relativePath"
+
+        // Set working directory
+        val execWorkingDir = execFile.parentFile
+        if (execWorkingDir != null) {
+            guestProgramLauncherComponent.workingDir = execWorkingDir
+            envVars.put("WINEPATH", "$itchDriveLetter:\\")
+        } else {
+            guestProgramLauncherComponent.workingDir = gameDir
+        }
+
+        Timber.d("itch Wine command: \"$windowsPath\"")
+        return "\"$windowsPath\""
     }
 }

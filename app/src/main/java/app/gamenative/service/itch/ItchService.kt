@@ -8,6 +8,7 @@ import android.os.IBinder
 import app.gamenative.PluviaApp
 import app.gamenative.data.DownloadInfo
 import app.gamenative.data.ItchGame
+import app.gamenative.data.LaunchInfo
 import app.gamenative.data.LibraryItem
 import app.gamenative.db.dao.ItchGameDao
 import app.gamenative.events.AndroidEvent
@@ -202,15 +203,15 @@ class ItchService : Service() {
             return getInstance()?.activeDownloads?.isNotEmpty() ?: false
         }
 
-        fun getCurrentlyDownloadingGame(): String? {
-            return getInstance()?.activeDownloads?.keys?.firstOrNull()
-        }
+//        fun getCurrentlyDownloadingGame(): String? {
+//            return getInstance()?.activeDownloads?.keys?.firstOrNull()
+//        }
 
-        fun getDownloadInfo(gameId: String): DownloadInfo? {
+        fun getDownloadInfo(gameId: Long): DownloadInfo? {
             return getInstance()?.activeDownloads?.get(gameId)
         }
 
-        fun getActiveDownloads(): Map<String, DownloadInfo> =
+        fun getActiveDownloads(): Map<Long, DownloadInfo> =
             getInstance()?.activeDownloads?.let { HashMap(it) } ?: emptyMap()
 
         fun hasPartialDownload(context : Context, game: ItchGame): Boolean {
@@ -256,11 +257,11 @@ class ItchService : Service() {
 //                .toList()
 //        }
 
-        fun cleanupDownload(gameId: String) {
+        fun cleanupDownload(gameId: Long) {
             getInstance()?.activeDownloads?.remove(gameId)
         }
 
-        fun cancelDownload(gameId: String): Boolean {
+        fun cancelDownload(gameId: Long): Boolean {
             val instance = getInstance()
             val downloadInfo = instance?.activeDownloads?.get(gameId)
 
@@ -332,19 +333,17 @@ class ItchService : Service() {
             return getInstance()?.itchManager?.getLaunchExecutable(appId, container) ?: ""
         }
 
-        //  fun getGogWineStartCommand(
-        //      libraryItem: LibraryItem,
-        //      container: com.winlator.container.Container,
-        //      bootToContainer: Boolean,
-        //      appLaunchInfo: LaunchInfo?,
-        //      envVars: com.winlator.core.envvars.EnvVars,
-        //      guestProgramLauncherComponent: com.winlator.xenvironment.components.GuestProgramLauncherComponent,
-        //      gameId: Int,
-        //  ): String {
-        //      return getInstance()?.itchManager?.getGogWineStartCommand(
-        //          libraryItem, container, bootToContainer, appLaunchInfo, envVars, guestProgramLauncherComponent, gameId,
-        //      ) ?: "\"explorer.exe\""
-        //  }
+      fun getWineStartCommand(
+          libraryItem: LibraryItem,
+          container: com.winlator.container.Container,
+          envVars: com.winlator.core.envvars.EnvVars,
+          guestProgramLauncherComponent: com.winlator.xenvironment.components.GuestProgramLauncherComponent,
+          gameId: Long,
+      ): String {
+          return getInstance()?.itchManager?.getWineStartCommand(
+              libraryItem, container, envVars, guestProgramLauncherComponent, gameId,
+          ) ?: "\"explorer.exe\""
+      }
 
         suspend fun refreshLibrary(context: Context): Result<Int> {
             return getInstance()?.itchManager?.refreshLibrary(context)
@@ -370,12 +369,11 @@ class ItchService : Service() {
             }
 
             // Track in activeDownloads first
-            instance.activeDownloads[gameId.toString()] = downloadInfo
+            instance.activeDownloads[gameId] = downloadInfo
 
             // Launch download in service scope so it runs independently
             val job = instance.scope.launch {
                 try {
-
                     val uploads = manager.getUploadsForGame(context, gameId).getOrThrow();
 
                     // builds could be linux or mac or etc - we just care about windows
@@ -431,7 +429,7 @@ class ItchService : Service() {
                 } finally {
                     // Remove from activeDownloads for both success and failure
                     // so UI knows download is complete and to prevent stale entries
-                    instance.activeDownloads.remove(gameId.toString())
+                    instance.activeDownloads.remove(gameId)
                     Timber.d("[Download] Finished for game $gameId, progress: ${downloadInfo.getProgress()}, active: ${downloadInfo.isActive()}")
                 }
             }
@@ -644,7 +642,7 @@ class ItchService : Service() {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     // Track active downloads by game ID
-    private val activeDownloads = ConcurrentHashMap<String, DownloadInfo>()
+    private val activeDownloads = ConcurrentHashMap<Long, DownloadInfo>()
 
     private val onEndProcess: (AndroidEvent.EndProcess) -> Unit = { stop() }
 

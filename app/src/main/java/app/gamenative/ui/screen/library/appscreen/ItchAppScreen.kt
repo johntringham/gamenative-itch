@@ -196,7 +196,7 @@ class ItchAppScreen : BaseAppScreen() {
 
     override fun isDownloading(context: Context, libraryItem: LibraryItem): Boolean {
         Timber.tag(TAG).d("isDownloading: checking appId=${libraryItem.appId}")
-        val downloadInfo = ItchService.getDownloadInfo(libraryItem.gameId.toString()) ?: return false
+        val downloadInfo = ItchService.getDownloadInfo(libraryItem.gameId.toLong()) ?: return false
         val downloading = downloadInfo.isPostInstallSyncing() || downloadInfo.isActive()
         Timber.tag(TAG).d(
             "isDownloading: appId=${libraryItem.appId}, postInstallSyncing=${downloadInfo.isPostInstallSyncing()}, active=${downloadInfo.isActive()}, result=$downloading",
@@ -205,7 +205,7 @@ class ItchAppScreen : BaseAppScreen() {
     }
 
     override fun getDownloadProgress(context: Context, libraryItem: LibraryItem): Float {
-        val downloadInfo = ItchService.getDownloadInfo(libraryItem.gameId.toString())
+        val downloadInfo = ItchService.getDownloadInfo(libraryItem.gameId.toLong())
         val progress = downloadInfo?.getProgress() ?: 0f
         Timber.tag(TAG).d("getDownloadProgress: appId=${libraryItem.appId}, progress=$progress")
         return progress
@@ -218,7 +218,7 @@ class ItchAppScreen : BaseAppScreen() {
     override fun onDownloadInstallClick(context: Context, libraryItem: LibraryItem, onClickPlay: (Boolean) -> Unit) {
         Timber.tag(TAG).i("onDownloadInstallClick: appId=${libraryItem.appId}, name=${libraryItem.name}")
         // ItchService expects numeric gameId
-        val gameId = libraryItem.gameId.toString()
+        val gameId = libraryItem.gameId.toLong();
         val downloadInfo = ItchService.getDownloadInfo(gameId)
         val isDownloading = isDownloading(context, libraryItem)
         val installed = isInstalled(context, libraryItem)
@@ -314,7 +314,7 @@ class ItchAppScreen : BaseAppScreen() {
 
     override fun onPauseResumeClick(context: Context, libraryItem: LibraryItem) {
         Timber.tag(TAG).i("onPauseResumeClick: appId=${libraryItem.appId}")
-        val gameId = libraryItem.gameId.toString()
+        val gameId = libraryItem.gameId.toLong()
         val downloadInfo = ItchService.getDownloadInfo(gameId)
         val isDownloading = isDownloading(context, libraryItem)
         val hasPartial = hasPartialDownload(context, libraryItem)
@@ -426,14 +426,14 @@ class ItchAppScreen : BaseAppScreen() {
 
     private fun triggerItchVerifyDownload(context: Context, libraryItem: LibraryItem, language: String) {
         CoroutineScope(Dispatchers.IO).launch {
-            val gameId = libraryItem.gameId.toString()
-            if (!ItchService.isGameInstalled(gameId.toLong())) return@launch
+            val gameId = libraryItem.gameId.toLong()
+            if (!ItchService.isGameInstalled(gameId)) return@launch
             if (ItchService.getDownloadInfo(gameId)?.isActive() == true) return@launch
 
-            val installPath = ItchService.getInstallPath(gameId.toLong())
+            val installPath = ItchService.getInstallPath(gameId)
                 ?: ItchConstants.getGameInstallPath(context, libraryItem.name)
 
-            ItchService.downloadGame(context, gameId.toLong(), installPath, language)
+            ItchService.downloadGame(context, gameId, installPath, language)
         }
     }
 
@@ -515,7 +515,7 @@ class ItchAppScreen : BaseAppScreen() {
                 if (event.isDownloading) {
                     // Download started - attach progress listener
                     // ItchService expects numeric gameId
-                    val downloadInfo = ItchService.getDownloadInfo(libraryItem.gameId.toString())
+                    val downloadInfo = ItchService.getDownloadInfo(libraryItem.gameId.toLong())
                     if (downloadInfo != null) {
                         // Remove previous listener if exists
                         currentProgressListener?.let { listener ->
@@ -539,7 +539,7 @@ class ItchAppScreen : BaseAppScreen() {
                 } else {
                     // Download stopped/completed - clean up listener
                     currentProgressListener?.let { listener ->
-                        val downloadInfo = ItchService.getDownloadInfo(libraryItem.gameId.toString())
+                        val downloadInfo = ItchService.getDownloadInfo(libraryItem.gameId.toLong())
                         downloadInfo?.removeProgressListener(listener)
                         currentProgressListener = null
                     }
@@ -633,7 +633,7 @@ class ItchAppScreen : BaseAppScreen() {
                 DialogType.CANCEL_APP_DOWNLOAD -> {
                     {
                         hideInstallDialog(appId)
-                        val gameId = libraryItem.gameId.toString()
+                        val gameId = libraryItem.gameId.toLong()
                         CoroutineScope(Dispatchers.IO).launch {
                             val downloadInfo = ItchService.getDownloadInfo(gameId)
                             val wasDownloading = downloadInfo != null &&

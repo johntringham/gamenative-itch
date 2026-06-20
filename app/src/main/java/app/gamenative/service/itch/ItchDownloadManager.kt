@@ -202,6 +202,8 @@ class ItchDownloadManager @Inject constructor(
 
                 downloadInfo.updateStatusMessage("Downloading...");
                 downloadInfo.emitProgressChange();
+                downloadInfo.setActive(true);
+                downloadInfo.initializeBytesDownloaded(0);
 
                 val fileOutputStream = FileOutputStream(file);
                 BufferedOutputStream(fileOutputStream)
@@ -218,9 +220,10 @@ class ItchDownloadManager @Inject constructor(
                             downloadInfo.updateBytesDownloaded(n.toLong())
                             if (copiedInFile >= progressInterval || downloadInfo.getBytesDownloaded() >= upload.size) {
                                 copiedInFile = 0L
-                                Timber.tag("Itch").i("Download at ${downloadInfo.getBytesDownloaded()} of ${upload.size}");
+                                val progress = (downloadInfo.getBytesDownloaded().toFloat() / upload.size).coerceIn(0f, 1f);
+                                Timber.tag("Itch").i("Download at ${downloadInfo.getBytesDownloaded()} of ${upload.size} - $progress");
                                 downloadInfo.setProgress(
-                                    (downloadInfo.getBytesDownloaded().toFloat() / upload.size).coerceIn(0f, 1f)
+                                    progress
                                 )
                                 downloadInfo.emitProgressChange()
                             }
