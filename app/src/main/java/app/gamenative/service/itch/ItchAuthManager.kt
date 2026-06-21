@@ -1,7 +1,6 @@
 package app.gamenative.service.itch
 
 import android.content.Context
-import app.gamenative.service.gog.GOGAuthManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable

@@ -34,6 +34,11 @@ import timber.log.Timber
 private val httpClient = Net.http
 internal val apiUrlRoot : String = "https://api.itch.io";
 
+/*
+* "Owned Keys" are items in a user's itch library. They may or may not have been purchased (could have been for free
+* or part of a larger bundle). Each owned key contains an ID (used as "download_key_id" when downloading) and a game,
+* and other data.
+ */
 @Serializable
 data class OwnedKey(
     @SerialName("created_at")
@@ -66,11 +71,18 @@ data class Game(
     val url: String,
     @SerialName("cover_url")
     val coverUrl: String? = null,
+
+    // Traits are general purpose flags, and include what operating system(s) they support.
+    // Values include "p_windows", "p_linux", "p_osx", "can_be_bought", etc
+    // May be useful for filtering
     @Serializable(with = TreatEmptyObjectsAsEmptyListsSerializer::class)
     val traits: List<String>? = null,
+
+    // The user is whoever uploaded it (ie. the dev) - it's not the currently logged-in user.
     val user: User? = null,
 )
 
+// A "user" is an itch.io account (either the logged in user, or a itch.io dev)
 @Serializable
 data class User(
     @SerialName("cover_url")
@@ -83,6 +95,8 @@ data class User(
     val displayName: String? = null,
 )
 
+// An "upload" is something a game dev has uploaded as a distributable of their game. Games can have
+// multiple available uploads at the same time (eg. Win/Mac/Android/Linux/Soundtrack/Free demo, etc).
 @Serializable
 data class Upload(
     @SerialName("channel_name")
@@ -94,8 +108,11 @@ data class Upload(
     val createdAt: String? = null,
     @SerialName("display_name")
     val displayName: String? = null,
+
+    // Traits can indicate operating system - eg. "p_windows", "p_windows", "p_linux", "p_osx"
     @Serializable(with = TreatEmptyObjectsAsEmptyListsSerializer::class)
     val traits: List<String>?= null,
+
     val filename: String?= null,
     @SerialName("build_id")
     val buildId: Long?= null,
@@ -108,6 +125,7 @@ data class Upload(
     val storage: String?,
 )
 
+// Builds contain more versioning info for a particular upload
 @Serializable
 data class Build(
     @SerialName("upload_id")
@@ -127,7 +145,9 @@ data class Build(
     val parentBuildId: Long?= null,
 )
 
-
+// ----
+// Response classes
+// ----
 @Serializable
 data class OwnedKeysResponse(
     val page: Long,
@@ -147,6 +167,8 @@ data class ProfileResponse(
     val user : User
 )
 
+private const val MAX_OWNED_KEYS_PAGES = 30;
+
 object ItchApiClient {
 
     val jsonSerializer = Json { ignoreUnknownKeys = true;
@@ -154,7 +176,9 @@ object ItchApiClient {
         isLenient = true;
     }
 
-    public suspend fun getProfile(apiKey : String) : Result<User>
+    // Returns info about the currently logged-in user. Used as a lightweight way of confirming
+    // that the API key is valid.
+    suspend fun getProfile(apiKey : String) : Result<User>
     {
         val profileUrl = "$apiUrlRoot/profile".toHttpUrl();
         val request = okhttp3.Request.Builder().url(profileUrl).get().header("Authorization", "Bearer $apiKey").build();
@@ -185,42 +209,43 @@ object ItchApiClient {
         return Result.success(profileResponse.user);
     }
 
+    // Returns all items owned by the currently logged-in user
     suspend fun getOwnedKeys(auth : ItchAuth) : Result<List<OwnedKey>>
     {
         try {
+            // Results from the endpoint are paginated, with 50 entries per page
             var page = 1;
             val keys = ArrayList<OwnedKey>()
-            while(page < 20){
+            while(page < MAX_OWNED_KEYS_PAGES){ // Maxing out after 30 pages = 1,500 games
                 var keysOnPage = getOwnedKeysPage(auth, page).getOrThrow();
                 if(keysOnPage.count() == 0){
-                    // last page
+                    // No more pages
                     return Result.success(keys);
                 }
 
                 keys.addAll(keysOnPage);
-
                 page++;
             }
 
-            Timber.tag("itch").i("Stopped looking for owned-keys after page 20");
+            Timber.tag("itch").w("Stopped looking for owned-keys after page $MAX_OWNED_KEYS_PAGES");
             return Result.success(keys);
-
         } catch (e : Exception) {
             return Result.failure(Exception("Failed to get games list - ${e.message}"))
         }
     }
 
-    suspend fun getOwnedKeysPage(auth : ItchAuth, page : Int) : Result<List<OwnedKey>>
+    private suspend fun getOwnedKeysPage(auth : ItchAuth, page : Int) : Result<List<OwnedKey>>
     {
         try {
             val ownedKeysUrl = "$apiUrlRoot/profile/owned-keys?page=$page".toHttpUrl();
             val ownedKeysResponse = makeApiCall<OwnedKeysResponse>(auth, ownedKeysUrl).getOrThrow();
-            return Result.success(ownedKeysResponse.ownedKeys); // todo: pages. it's just a query param ?pages=5
+            return Result.success(ownedKeysResponse.ownedKeys);
         } catch (e : Exception) {
-            return Result.failure(Exception("Failed to get games list"))
+            return Result.failure(Exception("Failed to get games list page - ${e.message}"))
         }
     }
 
+    // Games the uploads for this game
     suspend fun getGameUploads(auth : ItchAuth, gameId : Long, downloadKeyId : Long) : Result<List<Upload>>
     {
         try {
@@ -232,12 +257,15 @@ object ItchApiClient {
         }
     }
 
-    public fun getDownloadUrl(uploadId : Long, downloadKey : Long, apiKey : String): Request {
+    // Gets the actual download URL. Will typically be a zip file, but other types are possible (eg. raw exe)
+    // Note: the API key is just a bare query parameter here - this URL should not be logged
+    fun getDownloadUrl(uploadId : Long, downloadKey : Long, apiKey : String): Request {
         val url = "$apiUrlRoot/uploads/$uploadId/download?download_key_id=$downloadKey&api_key=$apiKey"
         val request = Request.Builder().url(url).get().build();
         return request;
     }
 
+    // Calls the itch.io api with auth headers and deserialises the response
     private suspend inline fun <reified TResponse> makeApiCall(
         auth: ItchAuth,
         url: HttpUrl
@@ -277,8 +305,8 @@ object ItchApiClient {
     }
 }
 
-// Itch json sometimes returns {} for empty arrays instead of []. This serialiser is necessary to check if
-// things we expect to be arrays aren't actually empty objects.
+// Itch json can return {} for empty arrays instead of [], which kotlin doesn't like.
+// This serialiser is necessary to check if things we expect to be arrays aren't actually empty json objects.
 class TreatEmptyObjectsAsEmptyListsSerializer<E>(val elementSerializer: KSerializer<E>) : KSerializer<List<E>>
 {
     override val descriptor: SerialDescriptor = ListSerializer(elementSerializer).descriptor

@@ -40,18 +40,12 @@ import javax.inject.Inject
  * - ItchApiClient: Api Layer for interacting with Itch's APIs
  * - ItchDownloadManager: Handles Download Logic for Games
  * - ItchConstants: Shared Constants for our Itch-related data
- * - ItchCloudSavesManager: Handler for Cloud Saves
  * - ItchAuthManager: Authentication and account management
  * - ItchManager: Game library, downloads, and installation
- * - ItchManifestParser: Parses and has utils for parsing/extracting/decompressing manifests.
- * - ItchDataMdoels: Data Models for Itch-related Data types such as API responses
- *
  */
 @AndroidEntryPoint
 class ItchService : Service() {
     companion object {
-        val externalItchGamesPath: String? = null;
-        val internalItchGamesPath: String? = null;
         private const val ACTION_SYNC_LIBRARY = "app.gamenative.ITCH_SYNC_LIBRARY"
         private const val ACTION_MANUAL_SYNC = "app.gamenative.ITCH_MANUAL_SYNC"
         private const val SYNC_THROTTLE_MILLIS = 15 * 60 * 1000L // 15 minutes
@@ -116,10 +110,6 @@ class ItchService : Service() {
         // AUTHENTICATION - Delegate to ItchAuthManager
         // ==========================================================================
 
-//        suspend fun authenticateWithCode(context: Context, authorizationCode: String): Result<ItchAuth> {
-//            return ItchAuthManager.authenticateWithCode(context, authorizationCode)
-//        }
-
         fun hasStoredCredentials(context: Context): Boolean {
             return ItchAuthManager.hasStoredCredentials(context)
         }
@@ -127,10 +117,6 @@ class ItchService : Service() {
         suspend fun getStoredCredentials(context: Context): Result<ItchAuth> {
             return ItchAuthManager.getStoredCredentials(context)
         }
-
-//        suspend fun validateCredentials(context: Context): Result<Boolean> {
-//            return ItchAuthManager.validateCredentials(context)
-//        }
 
         fun clearStoredCredentials(context: Context): Boolean {
             return ItchAuthManager.clearStoredCredentials(context)
@@ -203,10 +189,6 @@ class ItchService : Service() {
             return getInstance()?.activeDownloads?.isNotEmpty() ?: false
         }
 
-//        fun getCurrentlyDownloadingGame(): String? {
-//            return getInstance()?.activeDownloads?.keys?.firstOrNull()
-//        }
-
         fun getDownloadInfo(gameId: Long): DownloadInfo? {
             return getInstance()?.activeDownloads?.get(gameId)
         }
@@ -227,35 +209,6 @@ class ItchService : Service() {
             val installPath = ItchConstants.getGameInstallPath(context, title)
             return app.gamenative.utils.MarkerUtils.hasPartialInstall(installPath)
         }
-//
-//        private fun getPartialInstallPaths(): Set<String> {
-//            val roots = buildList {
-//                add(ItchConstants.internalItchGamesPath)
-//                if (app.gamenative.PrefManager.externalStoragePath.isNotBlank()) {
-//                    add(ItchConstants.externalItchGamesPath)
-//                }
-//            }.distinct()
-//
-//            return roots.asSequence()
-//                .flatMap { root -> app.gamenative.utils.MarkerUtils.findResumablePartialInstalls(root).asSequence() }
-//                .toSet()
-//        }
-//
-//        suspend fun getPartialDownloads(): List<String> {
-//            val instance = getInstance() ?: return emptyList()
-//            val partialInstallPaths = getPartialInstallPaths()
-//            if (partialInstallPaths.isEmpty()) return emptyList()
-//
-//            return instance.itchManager.getNonInstalledGames()
-//                .asSequence()
-//                .filter { game -> !instance.activeDownloads.containsKey(game.id) }
-//                .filter { game ->
-//                    val title = game.title.ifBlank { return@filter false }
-//                    partialInstallPaths.contains(ItchConstants.getGameInstallPath(title))
-//                }
-//                .map { it.id }
-//                .toList()
-//        }
 
         fun cleanupDownload(gameId: Long) {
             getInstance()?.activeDownloads?.remove(gameId)
@@ -287,10 +240,6 @@ class ItchService : Service() {
             }
         }
 
-//        suspend fun updateItchGame(game: ItchGame) {
-//            getInstance()?.itchManager?.updateGame(game)
-//        }
-
         fun isGameInstalled(gameId: Long): Boolean {
             return runBlocking(Dispatchers.IO) {
                 val game = getInstance()?.itchManager?.getGameFromDbById(gameId)
@@ -314,16 +263,6 @@ class ItchService : Service() {
                 if (game?.isInstalled == true) game.installPath else null
             }
         }
-
-        fun verifyInstallation(gameId: Long): Pair<Boolean, String?> {
-            return getInstance()?.itchManager?.verifyInstallation(gameId)
-                ?: Pair(false, "Service not available")
-        }
-
-//        suspend fun getInstalledExe(libraryItem: LibraryItem): String {
-//            return getInstance()?.itchManager?.getInstalledExe(libraryItem)
-//                ?: ""
-//        }
 
         /**
          * Resolves the effective launch executable for a Itch game (container config or auto-detected).
@@ -438,12 +377,6 @@ class ItchService : Service() {
             return Result.success(downloadInfo)
         }
 
-
-//        suspend fun refreshSingleGame(gameId: String, context: Context): Result<ItchGame?> {
-//            return getInstance()?.itchManager?.refreshSingleGame(gameId, context)
-//                ?: Result.failure(Exception("Service not available"))
-//        }
-
         /**
          * Delete/uninstall a Itch game
          * Delegates to ItchManager.deleteGame
@@ -452,183 +385,6 @@ class ItchService : Service() {
             return getInstance()?.itchManager?.deleteGame(context, libraryItem)
                 ?: Result.failure(Exception("Service not available"))
         }
-
-        /**
-         * Sync Itch cloud saves for a game
-         * @param context Android context
-         * @param appId Game app ID (e.g., "ITCH_123456")
-         * @param preferredAction Preferred sync action: "download", "upload", or "none"
-         * @return true if sync succeeded, false otherwise
-         */
-//        suspend fun syncCloudSaves(
-//            context: Context,
-//            appId: String,
-//            preferredAction: String = "none",
-//        ): Boolean = withContext(Dispatchers.IO) {
-//            try {
-//                Timber.tag("itch").d("[Cloud Saves] syncCloudSaves called for $appId with action: $preferredAction")
-//
-//                // Check if there's already a sync in progress for this appId
-//                val serviceInstance = getInstance()
-//                if (serviceInstance == null) {
-//                    Timber.tag("itch").e("[Cloud Saves] Service instance not available for sync start")
-//                    return@withContext false
-//                }
-//
-//                if (!serviceInstance.itchManager.startSync(appId)) {
-//                    Timber.tag("itch").w("[Cloud Saves] Sync already in progress for $appId, skipping duplicate sync")
-//                    return@withContext false
-//                }
-//
-//                try {
-//                    val instance = getInstance()
-//                    if (instance == null) {
-//                        Timber.tag("itch").e("[Cloud Saves] Service instance not available")
-//                        return@withContext false
-//                    }
-//
-//                    if (!ItchAuthManager.hasStoredCredentials(context)) {
-//                        Timber.tag("itch").e("[Cloud Saves] Cannot sync saves: not authenticated")
-//                        return@withContext false
-//                    }
-//
-//                    val authConfigPath = ItchAuthManager.getAuthConfigPath(context)
-//                    Timber.tag("itch").d("[Cloud Saves] Using auth config path: $authConfigPath")
-//
-//                    // Get game info
-//                    val gameId = ContainerUtils.extractGameIdFromContainerId(appId)
-//                    Timber.tag("itch").d("[Cloud Saves] Extracted game ID: $gameId from appId: $appId")
-//                    val game = instance.itchManager.getGameFromDbById(gameId.toString())
-//
-//                    if (game == null) {
-//                        Timber.tag("itch").e("[Cloud Saves] Game not found for appId: $appId")
-//                        return@withContext false
-//                    }
-//                    Timber.tag("itch").d("[Cloud Saves] Found game: ${game.title}")
-//
-//                    // Get save directory paths (Android runs games through Wine, so always Windows)
-//                    Timber.tag("itch").d("[Cloud Saves] Resolving save directory paths for $appId")
-//                    val saveLocations = instance.itchManager.getSaveDirectoryPath(context, appId, game.title)
-//
-//                    if (saveLocations == null || saveLocations.isEmpty()) {
-//                        Timber.tag("itch").w("[Cloud Saves] No save locations found for game $appId (cloud saves may not be enabled)")
-//                        return@withContext false
-//                    }
-//                    Timber.tag("itch").i("[Cloud Saves] Found ${saveLocations.size} save location(s) for $appId")
-//
-//                    var allSucceeded = true
-//
-//                    // Sync each save location
-//                    for ((index, location) in saveLocations.withIndex()) {
-//                        try {
-//                            Timber.tag("itch").d("[Cloud Saves] Processing location ${index + 1}/${saveLocations.size}: '${location.name}'")
-//
-//                            // Log directory state BEFORE sync
-//                            try {
-//                                val saveDir = java.io.File(location.location)
-//                                Timber.tag("itch").d("[Cloud Saves] [BEFORE] Checking directory: ${location.location}")
-//                                Timber.tag("itch").d("[Cloud Saves] [BEFORE] Directory exists: ${saveDir.exists()}, isDirectory: ${saveDir.isDirectory}")
-//                                if (saveDir.exists() && saveDir.isDirectory) {
-//                                    val filesBefore = saveDir.listFiles()
-//                                    if (filesBefore != null && filesBefore.isNotEmpty()) {
-//                                        Timber.tag("itch").i(
-//                                            "[Cloud Saves] [BEFORE] ${filesBefore.size} files in '${location.name}': ${filesBefore.joinToString(", ") {
-//                                                it.name
-//                                            }}",
-//                                        )
-//                                    } else {
-//                                        Timber.tag("itch").i("[Cloud Saves] [BEFORE] Directory '${location.name}' is empty")
-//                                    }
-//                                } else {
-//                                    Timber.tag("itch").i("[Cloud Saves] [BEFORE] Directory '${location.name}' does not exist yet")
-//                                }
-//                            } catch (e: Exception) {
-//                                Timber.tag("itch").e(e, "[Cloud Saves] [BEFORE] Failed to check directory")
-//                            }
-//
-//                            // Get stored timestamp for this location
-//                            val timestampStr = instance.itchManager.getCloudSaveSyncTimestamp(appId, location.name)
-//                            val timestamp = timestampStr.toLongOrNull() ?: 0L
-//
-//                            Timber.tag("itch").i("[Cloud Saves] Syncing '${location.name}' for game $gameId (clientId: ${location.clientId}, path: ${location.location}, timestamp: $timestamp, action: $preferredAction)")
-//
-//                            // Validate clientSecret is available
-//                            if (location.clientSecret.isEmpty()) {
-//                                Timber.tag("itch").e("[Cloud Saves] Missing clientSecret for '${location.name}', skipping sync")
-//                                continue
-//                            }
-//
-//                            val cloudSavesManager = ItchCloudSavesManager(context)
-//                            val newTimestamp = cloudSavesManager.syncSaves(
-//                                clientId = location.clientId,
-//                                clientSecret = location.clientSecret,
-//                                localPath = location.location,
-//                                dirname = location.name,
-//                                lastSyncTimestamp = timestamp,
-//                                preferredAction = preferredAction,
-//                            )
-//
-//                            if (newTimestamp > 0) {
-//                                // Success - store new timestamp
-//                                instance.itchManager.setCloudSaveSyncTimestamp(appId, location.name, newTimestamp.toString())
-//                                Timber.tag("itch").d("[Cloud Saves] Updated timestamp for '${location.name}': $newTimestamp")
-//
-//                                // Log the save files in the directory after sync
-//                                try {
-//                                    val saveDir = java.io.File(location.location)
-//                                    if (saveDir.exists() && saveDir.isDirectory) {
-//                                        val files = saveDir.listFiles()
-//                                        if (files != null && files.isNotEmpty()) {
-//                                            val fileList = files.joinToString(", ") { it.name }
-//                                            Timber.tag("itch").i("[Cloud Saves] [$preferredAction] Files in '${location.name}': $fileList (${files.size} files)")
-//
-//                                            // Log detailed file info
-//                                            files.forEach { file ->
-//                                                val size = if (file.isFile) "${file.length()} bytes" else "directory"
-//                                                Timber.tag("itch").d("[Cloud Saves] [$preferredAction]   - ${file.name} ($size)")
-//                                            }
-//                                        } else {
-//                                            Timber.tag("itch").w("[Cloud Saves] [$preferredAction] Directory '${location.name}' is empty at: ${location.location}")
-//                                        }
-//                                    } else {
-//                                        Timber.tag("itch").w("[Cloud Saves] [$preferredAction] Directory not found: ${location.location}")
-//                                    }
-//                                } catch (e: Exception) {
-//                                    Timber.tag("itch").e(e, "[Cloud Saves] Failed to list files in directory: ${location.location}")
-//                                }
-//
-//                                Timber.tag("itch").i("[Cloud Saves] Successfully synced save location '${location.name}' for game $gameId")
-//                            } else {
-//                                Timber.tag("itch").e("[Cloud Saves] Failed to sync save location '${location.name}' for game $gameId (timestamp: $newTimestamp)")
-//                                allSucceeded = false
-//                            }
-//                        } catch (e: CancellationException) {
-//                            throw e
-//                        } catch (e: Exception) {
-//                            Timber.tag("itch").e(e, "[Cloud Saves] Exception syncing save location '${location.name}' for game $gameId")
-//                            allSucceeded = false
-//                        }
-//                    }
-//
-//                    if (allSucceeded) {
-//                        Timber.tag("itch").i("[Cloud Saves] All save locations synced successfully for $appId")
-//                        return@withContext true
-//                    } else {
-//                        Timber.tag("itch").w("[Cloud Saves] Some save locations failed to sync for $appId")
-//                        return@withContext false
-//                    }
-//                } finally {
-//                    // Always end the sync, even if an exception occurred
-//                    getInstance()?.itchManager?.endSync(appId)
-//                    Timber.tag("itch").d("[Cloud Saves] Sync completed and lock released for $appId")
-//                }
-//            } catch (e: CancellationException) {
-//                throw e
-//            } catch (e: Exception) {
-//                Timber.tag("itch").e(e, "[Cloud Saves] Failed to sync cloud saves for App ID: $appId")
-//                return@withContext false
-//            }
-//        }
     }
 
     private lateinit var notificationHelper: NotificationHelper

@@ -1,10 +1,8 @@
 package app.gamenative.service.itch
 
 import android.content.Context
-import app.gamenative.data.GOGGame
 import app.gamenative.data.GameSource
 import app.gamenative.data.ItchGame
-import app.gamenative.data.LaunchInfo
 import app.gamenative.data.LibraryItem
 import app.gamenative.db.dao.ItchGameDao
 import app.gamenative.enums.AppType
@@ -32,7 +30,7 @@ class ItchManager @Inject constructor(
 
     private val REFRESH_BATCH_SIZE = 10
 
-    public suspend fun startBackgroundSync(context : Context): Result<Unit> {
+    suspend fun startBackgroundSync(context : Context): Result<Unit> {
         try {
             if (!ItchAuthManager.hasStoredCredentials(context)) {
                 Timber.w("Cannot start background sync: no stored credentials")
@@ -94,34 +92,11 @@ class ItchManager @Inject constructor(
 
         var totalProcessed = 0
 
-        Timber.tag("itch").d("Getting Game Details for ${newGameKeys.size} new GOG Games...")
+        Timber.tag("itch").d("Getting Game Details for ${newGameKeys.size} new itch Games...")
 
         val games = mutableListOf<ItchGame>()
 
-        // Use direct HTTP calls via GOGApiClient
         for ((index, ownedKey) in newGameKeys.withIndex()) {
-//            try {
-//                // Fetch game details using direct HTTP call
-//                val result = GOGApiClient.getGameById(context, id)
-//
-//                if (result.isSuccess) {
-//                    val gameDetails = result.getOrNull()
-//                    if (gameDetails != null) {
-//                        Timber.tag("GOG").d("Got Game Details for ID: $id")
-//                        val game = parseGameObject(gameDetails)
-//                        if (game != null) {
-//                            games.add(game)
-//                            Timber.tag("GOG").d("Refreshed Game: ${game.title}")
-//                            totalProcessed++
-//                        }
-//                    }
-//                } else {
-//                    Timber.w("GOG game ID $id not found in library after refresh")
-//                }
-//            } catch (e: Exception) {
-//                Timber.e(e, "Failed to parse game details for ID: $id")
-//            }
-
             val game = ownedKey.game;
             val itchGame = ItchGame(
                 ownedKey.gameId,
@@ -149,11 +124,6 @@ class ItchManager @Inject constructor(
             }
         }
 
-//        val detectedCount = detectAndUpdateExistingInstallations()
-//        if (detectedCount > 0) {
-//            Timber.d("Detected and updated $detectedCount existing installations")
-//        }
-
         return Result.success(ownedKeys.size);
     }
 
@@ -176,7 +146,7 @@ class ItchManager @Inject constructor(
     }
 
     /**
-     * Resolves the effective launch executable for a GOG game (container config or auto-detected).
+     * Resolves the effective launch executable for a itch game (container config or auto-detected).
      * Returns empty string if no executable can be found.
      */
     suspend fun getLaunchExecutable(appId: String, container: Container): String = withContext(Dispatchers.IO) {
@@ -195,7 +165,6 @@ class ItchManager @Inject constructor(
         }
     }
 
-    // Get the exe. There is a v1 and v2 depending on the age of the game.
     suspend fun getInstalledExe(libraryItem: LibraryItem): String = withContext(Dispatchers.IO) {
         val gameId = libraryItem.gameId.toLong()
         try {
@@ -206,25 +175,10 @@ class ItchManager @Inject constructor(
             if(topLevelExecutables?.size == 1){
                 topLevelExecutables[0].name;
             }else{
-
-//            // todo
-//
-//            val installDirFile = File(installPath)
-//            val exe = getGameExecutable(installPath, installDirFile)
-//            if (exe.isNotEmpty()) return@withContext exe
-//            val subdirs = installDirFile.listFiles()?.filter {
-//                it.isDirectory && it.name != "saves" && it.name != "_CommonRedist"
-//            } ?: emptyList()
-//
-//            for (subdir in subdirs) {
-//                val subdirExe = getGameExecutable(installPath, subdir)
-//                if (subdirExe.isNotEmpty()) return@withContext subdirExe
-//            }
-
             ""
             }
         } catch (e: Exception) {
-            Timber.e(e, "Failed to get executable for GOG game $gameId")
+            Timber.e(e, "Failed to get executable for itch game $gameId")
             ""
         }
     }
@@ -256,7 +210,7 @@ class ItchManager @Inject constructor(
                             failedPaths.add(path)
                         }
                     } else {
-                        Timber.w("GOG game directory doesn't exist: $path")
+                        Timber.w("Itch game directory doesn't exist: $path")
                     }
                     MarkerUtils.removeMarker(path, Marker.DOWNLOAD_COMPLETE_MARKER)
                     MarkerUtils.removeMarker(path, Marker.DOWNLOAD_IN_PROGRESS_MARKER)

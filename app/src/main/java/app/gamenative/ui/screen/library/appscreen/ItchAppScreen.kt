@@ -131,15 +131,11 @@ class ItchAppScreen : BaseAppScreen() {
         }
 
         // Parse itch's release date string to Unix timestamp
-        // Itch returns dates like "2022-08-18T17:50:00+0300" (without colon in timezone)
+        // Itch returns dates like "2020-06-09T14:25:26Z" - no timezone info
         // GameDisplayInfo expects Unix timestamp in SECONDS, not milliseconds
         val rawReleaseDate = "${game?.releaseDate}"
         val releaseDateTimestamp = if (!rawReleaseDate.isNullOrEmpty() && rawReleaseDate != "null") {
             try {
-
-//                val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'Z")
-//                val timestampMillis = ZonedDateTime.parse(rawReleaseDate, formatter).toInstant().toEpochMilli()
-//                val timestampSeconds = timestampMillis / 1000
                 DateTimeUtils.parseStoreReleaseDateToEpochSeconds(rawReleaseDate);
             } catch (e: Exception) {
                 Timber.tag(TAG).d("Release date not parseable (ignored): $rawReleaseDate")
