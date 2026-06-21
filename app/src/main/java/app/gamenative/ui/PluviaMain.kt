@@ -2816,8 +2816,10 @@ fun preLaunchApp(
         if (skipCloudSync || isLocalSavesOnly || gameSource == GameSource.ITCH) {
             if (isLocalSavesOnly) {
                 Timber.tag("preLaunchApp").i("Local saves only enabled for $appId — skipping Steam Cloud sync")
-            } else {
+            } else if(skipCloudSync) {
                 Timber.tag("preLaunchApp").w("Skipping Steam Cloud sync for $appId by user request")
+            }else if(gameSource == GameSource.ITCH){
+                Timber.tag("preLaunchApp").w("Itch doesn't support cloud saves, skipping sync for $appId")
             }
             setLoadingDialogVisible(false)
             onSuccess(context, appId)

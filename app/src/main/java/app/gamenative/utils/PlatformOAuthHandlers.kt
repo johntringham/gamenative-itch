@@ -5,6 +5,7 @@ import app.gamenative.service.amazon.AmazonService
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
 import app.gamenative.service.itch.ItchAuthManager
+import app.gamenative.service.itch.ItchService
 import kotlinx.coroutines.CoroutineScope
 import timber.log.Timber
 
@@ -136,8 +137,8 @@ object PlatformOAuthHandlers {
 
             if (result.isSuccess) {
                 Timber.i("[PlatformOAuth]: itch authentication successful!")
-//                GOGService.start(context)
-//                GOGService.triggerLibrarySync(context)
+                ItchService.start(context)
+                ItchService.triggerLibrarySync(context)
                 onSuccess(0)
                 onLoadingChange(false)
                 onDialogClose()

@@ -1068,7 +1068,7 @@ private fun sourceContainerColor(gameSource: GameSource): Color = when (gameSour
     GameSource.GOG -> MaterialTheme.colorScheme.tertiaryContainer
     GameSource.EPIC -> MaterialTheme.colorScheme.secondaryContainer
     GameSource.AMAZON -> MaterialTheme.colorScheme.surfaceContainerHighest
-    GameSource.ITCH -> MaterialTheme.colorScheme.surfaceContainerLow // idk
+    GameSource.ITCH -> MaterialTheme.colorScheme.surfaceContainerLow
     GameSource.CUSTOM_GAME -> MaterialTheme.colorScheme.surfaceVariant
 }
 

@@ -837,7 +837,7 @@ object ContainerStorageManager {
             GameSource.GOG -> listOf(GOGConstants.internalGOGGamesPath)
             GameSource.EPIC -> listOf(EpicConstants.internalEpicGamesPath(context))
             GameSource.AMAZON -> listOf(AmazonConstants.internalAmazonGamesPath(context))
-            GameSource.ITCH -> listOf(ItchService.internalItchGamesPath(context)) // todo
+            GameSource.ITCH -> listOf(ItchService.internalItchGamesPath(context))
             GameSource.CUSTOM_GAME -> emptyList()
         }
 

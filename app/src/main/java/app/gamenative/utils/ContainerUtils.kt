@@ -801,7 +801,6 @@ object ContainerUtils {
                 // For itch games, map the specific game directory to A: drive
                 val gameId = extractGameIdFromContainerId(appId)
                 val game = ItchService.getItchGameOf(gameId.toLong())
-                // todo: whats going on here?
                 if (game != null && game.installPath.isNotEmpty()) {
                     val gameInstallPath = game.installPath
                     val drive: Char = if (defaultDrives.contains("A:")) {
