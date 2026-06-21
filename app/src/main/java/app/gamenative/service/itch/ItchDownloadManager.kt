@@ -26,45 +26,6 @@ class ItchDownloadManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val itchManager: ItchManager
 ) {
-//    suspend fun downloadGame(
-//        game: ItchGame,
-//        upload: Upload,
-//        apiKey: String,
-//        file: File
-//    ) : Result<DownloadInfo> {
-//        try {
-//            Timber.tag("itch");
-//
-//            Timber.i("Starting download for ${game.title}")
-//
-//            val downloadRequest = ItchApiClient.getDownloadUrl(upload.id, game.downloadKey, apiKey);
-//            val downloadResponse = withContext(Dispatchers.IO){
-//                httpClient.newCall(downloadRequest).execute()
-//            }.use { response ->
-//
-//                if(response.isSuccessful == false){
-//                    Timber.i("Download failed for ${game.title}")
-//                    return Result.failure(Exception("Failed to download"));
-//                }
-//
-//                Timber.i("Successful download for ${game.title}")
-//
-//                val downloadStream = response.body.byteStream()
-//                var fileOutputStream = FileOutputStream(file);
-//                downloadStream.copyTo(fileOutputStream);
-//                fileOutputStream.flush()
-//                fileOutputStream.close()
-//
-//                Timber.i("Download ${game.title} written to ${file.toURI()}")
-//
-//                return Result.success(DownloadInfo(1,game.id.toInt(), CopyOnWriteArrayList()));
-//            }
-//
-//        } catch (e: Exception) {
-//            return Result.failure(Exception("Failed to download - ${e.message}"));
-//        }
-//    }
-
     suspend fun downloadGame(
         game: ItchGame,
         upload: Upload,
@@ -72,9 +33,13 @@ class ItchDownloadManager @Inject constructor(
         installFolder: File,
         downloadInfo : DownloadInfo
     ): Result<Unit> {
+        app.gamenative.PluviaApp.events.emitJava(
+            app.gamenative.events.AndroidEvent.DownloadStatusChanged(game.id.toInt(), true),
+        )
+
         try {
             val file = downloadGameUpload(game, upload, apiKey, installFolder, downloadInfo).getOrThrow();
-            unarchiveFile(file);
+            unarchiveFile(file, downloadInfo);
             finalizeInstallSuccess(game.id, installFolder, downloadInfo);
             return Result.success(Unit)
         } catch (e: Exception) {
@@ -82,31 +47,27 @@ class ItchDownloadManager @Inject constructor(
         }
     }
 
-    private fun unarchiveFile(file: File) {
-//        file.listFiles().forEach {
-
-
-            val extension = file.extension;
+    private fun unarchiveFile(file: File, downloadInfo: DownloadInfo) {
+        val extension = file.extension;
         Timber.tag("itch").i("Unarchiving $file");
 
-            when (extension) {
-                "zip" -> {
-                    extractZipContents(file, file.parentFile ?: file);
-                }
-
-                else -> {}
+        when (extension) {
+            "zip" -> {
+                extractZipContents(file, file.parentFile ?: file, downloadInfo);
             }
 
-//        }
+            else -> {}
+        }
     }
 
-    private fun extractZipContents(file: File, dest : File) {
+    private fun extractZipContents(file: File, dest: File, downloadInfo: DownloadInfo) {
         Timber.tag("itch").i("Unzipping $file");
 
         ZipFile(file.path).use {
             zip ->
             zip.entries().asSequence().forEach { entry ->
                 Timber.tag("itch").i("Unzipping zip entry $entry");
+                downloadInfo.updateStatusMessage("Unzipping ${entry.name}...");
 
                 val inputStream = zip.getInputStream(entry);
                 inputStream.use { stream ->
@@ -114,12 +75,7 @@ class ItchDownloadManager @Inject constructor(
                     val entryFile = File( path);
                     entryFile.parentFile?.mkdirs()
                     if(!entry.isDirectory) {
-
-//                    if(entry.isDirectory){
-//                        Timber.tag("itch").i("Creating zipped directory $entry");
-//                    } else {
                         writeExtractedEntryToFile(inputStream, entryFile);
-//                    }
                     }
                 }
             }
@@ -147,32 +103,9 @@ class ItchDownloadManager @Inject constructor(
         folder: File,
         downloadInfo : DownloadInfo
     ): Result<File> {
-        //val file = f.file
-        //val outFile = File(baseDir, file.path)
-        //outFile.parentFile?.mkdirs()
-
-//        if (file.size == 0L) {
-//            outFile.createNewFile()
-//            return Result.success(Unit)
-//        }
-
         downloadInfo.updateStatusMessage("Fetching builds...");
 
         val downloadRequest = ItchApiClient.getDownloadUrl(upload.id, game.downloadKey, apiKey);
-
-            //?: return Result.failure(Exception("No main.bin URL for product ${f.productId}"))
-
-//        val offset = 0;//file.offset
-//        if (offset == null) {
-//            return Result.failure(Exception("Gen 1 file ${file.path} has no offset (main.bin range request required)"))
-//        }
-
-//        val rangeHeader = "bytes=$offset-${offset + file.size - 1}"
-//        val request = Request.Builder()
-//            .url(mainBinUrl)
-//            .header("User-Agent", "GOG Galaxy")
-//            .header("Range", rangeHeader)
-//            .build()
 
         val mkDirs = folder.mkdirs();
         val exists = folder.exists()
@@ -186,7 +119,6 @@ class ItchDownloadManager @Inject constructor(
         {
             Timber.tag("itch").i("wtf");
         }
-//        folder.mkdirs();
 
         downloadInfo.updateStatusMessage("Starting download...");
         downloadInfo.setTotalExpectedBytes(upload.size);
@@ -232,9 +164,7 @@ class ItchDownloadManager @Inject constructor(
                 }
                 val bytesWritten = file.length()
                 if (bytesWritten != upload.size) return Result.failure(Exception("Size mismatch ${file.path}"))
-                val md5 = md.digest().joinToString("") { "%02x".format(it) }
-//                if (file.hash.isNotEmpty() && md5 != file.hash) return Result.failure(Exception("MD5 mismatch ${file.path}"))
-                // bytes already reported during copy; ensure final progress is exact
+
                 downloadInfo.setProgress(
                     (downloadInfo.getBytesDownloaded().toFloat() / upload.size).coerceIn(0f, 1f)
                 )
@@ -277,11 +207,5 @@ class ItchDownloadManager @Inject constructor(
         app.gamenative.PluviaApp.events.emitJava(
             app.gamenative.events.AndroidEvent.LibraryInstallStatusChanged(gameId.toInt(), app.gamenative.data.GameSource.ITCH),
         )
-    }
-
-    private sealed class DownloadState {
-        data class Downloading(val progress: Int) : DownloadState()
-        object Finished : DownloadState()
-        object Failed : DownloadState()
     }
 }

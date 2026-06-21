@@ -61,12 +61,12 @@ data class ItchGame(
     val exclude: Boolean = false,
     )
 
-data class ItchDownloadInfo(
-    val gameId: String,
-    val totalSize: Long,
-    val downloadedSize: Long = 0,
-    val progress: Float = 0f,
-    val isActive: Boolean = false,
-    val isPaused: Boolean = false,
-    val error: String? = null,
-)
+//data class ItchDownloadInfo(
+//    val gameId: String,
+//    val totalSize: Long,
+//    val downloadedSize: Long = 0,
+//    val progress: Float = 0f,
+//    val isActive: Boolean = false,
+//    val isPaused: Boolean = false,
+//    val error: String? = null,
+//)

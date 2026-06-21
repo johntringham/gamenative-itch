@@ -1,15 +1,34 @@
 package app.gamenative.service.itch
 
+import androidx.compose.animation.core.keyframes
 import app.gamenative.utils.Net
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.descriptors.element
+import kotlinx.serialization.encoding.CompositeDecoder
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.encoding.decodeStructure
+import kotlinx.serialization.encoding.encodeCollection
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonEncoder
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
+import okhttp3.Response
 import timber.log.Timber
 
 private val httpClient = Net.http
@@ -47,6 +66,7 @@ data class Game(
     val url: String,
     @SerialName("cover_url")
     val coverUrl: String? = null,
+    @Serializable(with = TreatEmptyObjectsAsEmptyListsSerializer::class)
     val traits: List<String>? = null,
     val user: User? = null,
 )
@@ -74,6 +94,7 @@ data class Upload(
     val createdAt: String? = null,
     @SerialName("display_name")
     val displayName: String? = null,
+    @Serializable(with = TreatEmptyObjectsAsEmptyListsSerializer::class)
     val traits: List<String>?= null,
     val filename: String?= null,
     @SerialName("build_id")
@@ -111,11 +132,13 @@ data class Build(
 data class OwnedKeysResponse(
     val page: Long,
     @SerialName("owned_keys")
+    @Serializable(with = TreatEmptyObjectsAsEmptyListsSerializer::class)
     val ownedKeys: List<OwnedKey>,
 )
 
 @Serializable
 data class UploadsResponse(
+    @Serializable(with = TreatEmptyObjectsAsEmptyListsSerializer::class)
     val uploads: List<Upload>,
 )
 
@@ -126,7 +149,10 @@ data class ProfileResponse(
 
 object ItchApiClient {
 
-    val jsonSerializer = Json { ignoreUnknownKeys = true }
+    val jsonSerializer = Json { ignoreUnknownKeys = true;
+        useArrayPolymorphism = true;
+        isLenient = true;
+    }
 
     public suspend fun getProfile(apiKey : String) : Result<User>
     {
@@ -159,10 +185,35 @@ object ItchApiClient {
         return Result.success(profileResponse.user);
     }
 
-    public suspend fun getOwnedKeys(auth : ItchAuth) : Result<List<OwnedKey>>
+    suspend fun getOwnedKeys(auth : ItchAuth) : Result<List<OwnedKey>>
     {
         try {
-            val ownedKeysUrl = "$apiUrlRoot/profile/owned-keys".toHttpUrl();
+            var page = 1;
+            val keys = ArrayList<OwnedKey>()
+            while(page < 20){
+                var keysOnPage = getOwnedKeysPage(auth, page).getOrThrow();
+                if(keysOnPage.count() == 0){
+                    // last page
+                    return Result.success(keys);
+                }
+
+                keys.addAll(keysOnPage);
+
+                page++;
+            }
+
+            Timber.tag("itch").i("Stopped looking for owned-keys after page 20");
+            return Result.success(keys);
+
+        } catch (e : Exception) {
+            return Result.failure(Exception("Failed to get games list - ${e.message}"))
+        }
+    }
+
+    suspend fun getOwnedKeysPage(auth : ItchAuth, page : Int) : Result<List<OwnedKey>>
+    {
+        try {
+            val ownedKeysUrl = "$apiUrlRoot/profile/owned-keys?page=$page".toHttpUrl();
             val ownedKeysResponse = makeApiCall<OwnedKeysResponse>(auth, ownedKeysUrl).getOrThrow();
             return Result.success(ownedKeysResponse.ownedKeys); // todo: pages. it's just a query param ?pages=5
         } catch (e : Exception) {
@@ -170,7 +221,7 @@ object ItchApiClient {
         }
     }
 
-    public suspend fun getGameUploads(auth : ItchAuth, gameId : Long, downloadKeyId : Long) : Result<List<Upload>>
+    suspend fun getGameUploads(auth : ItchAuth, gameId : Long, downloadKeyId : Long) : Result<List<Upload>>
     {
         try {
             val url = "$apiUrlRoot/games/$gameId/uploads?download_key_id=$downloadKeyId".toHttpUrl();
@@ -223,5 +274,53 @@ object ItchApiClient {
         }
 
         return Result.success(serialisedHttpResponse);
+    }
+}
+
+// Itch json sometimes returns {} for empty arrays instead of []. This serialiser is necessary to check if
+// things we expect to be arrays aren't actually empty objects.
+class TreatEmptyObjectsAsEmptyListsSerializer<E>(val elementSerializer: KSerializer<E>) : KSerializer<List<E>>
+{
+    override val descriptor: SerialDescriptor = ListSerializer(elementSerializer).descriptor
+
+    override fun serialize(encoder: Encoder, value: List<E>) {
+        val size = value.size
+        val composite = encoder.beginCollection(descriptor, size)
+        val iterator = value.iterator()
+        for (index in 0 until size) {
+            composite.encodeSerializableElement(descriptor, index, elementSerializer, iterator.next())
+        }
+        composite.endStructure(descriptor)
+    }
+
+    override fun deserialize(decoder: Decoder): List<E> {
+        val jsonInput = decoder as? JsonDecoder
+            ?: error("Can be deserialized only by JSON")
+        val rawJson = jsonInput.decodeJsonElement()
+        if (rawJson !is JsonArray) {
+            return arrayListOf()
+        }
+
+        val jsonArray = rawJson.jsonArray
+        val jsonParser = jsonInput.json
+        val arrayList = ArrayList<E>(jsonArray.size)
+
+        jsonArray.forEach { jsonElement ->
+            val result = readElement(jsonParser, jsonElement)
+            when {
+                result.isSuccess -> arrayList.add(result.getOrThrow())
+                result.isFailure -> error("Failed to deserialize")
+            }
+        }
+        arrayList.trimToSize()
+        return arrayList
+    }
+
+    private fun readElement(json: Json, jsonElement: JsonElement): Result<E> {
+        return try {
+            Result.success(json.decodeFromJsonElement(elementSerializer, jsonElement))
+        } catch (exception: Exception) {
+            Result.failure(exception)
+        }
     }
 }
