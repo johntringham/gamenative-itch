@@ -191,7 +191,7 @@ object ItchApiClient {
             if(response.isSuccessful == false){
                 val errorBody = response.body?.string() ?: "Unknown error";
                 Timber.tag("itch").e("API key check failed");
-                return Result.failure(Exception("failed to auth: ${response.code} - $errorBody"));
+                return Result.failure(Exception("Failed to authorize API key - $errorBody"));
             }
 
             val responseBody = response.body?.string() ?: return Result.failure(Exception("Empty response"))

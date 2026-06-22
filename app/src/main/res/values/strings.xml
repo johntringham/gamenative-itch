@@ -1997,6 +1997,9 @@
     <string name="itch_logout_success">Logged out from itch successfully</string>
     <string name="itch_logout_failed">Failed to logout: %s</string>
     <string name="itch_logout_in_progress">Logging out from itch…</string>
+    <string name="itch_auth_screen_title">Sign in to itch using an API key</string>
+    <string name="itch_auth_screen_api_instructions">You can generate an API key on itch.io\'s Account Settings page</string>
+    <string name="itch_auth_screen_api_key_label">API key</string>
 
     <!-- Workshop -->
     <string name="workshop_checking_mods">Checking Workshop mods…</string>
