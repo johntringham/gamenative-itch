@@ -1369,6 +1369,7 @@ private fun LibraryScreenContent(
             val gogLoggedIn = app.gamenative.service.gog.GOGAuthManager.hasStoredCredentials(context)
             val epicLoggedIn = app.gamenative.service.epic.EpicAuthManager.hasStoredCredentials(context)
             val amazonLoggedIn = app.gamenative.service.amazon.AmazonAuthManager.hasStoredCredentials(context)
+            val itchLoggedIn = app.gamenative.service.itch.ItchAuthManager.hasStoredCredentials(context)
 
             SystemMenu(
                 isOpen = isSystemMenuOpen,
@@ -1381,6 +1382,7 @@ private fun LibraryScreenContent(
                 gogLoggedIn = gogLoggedIn,
                 epicLoggedIn = epicLoggedIn,
                 amazonLoggedIn = amazonLoggedIn,
+                itchLoggedIn = itchLoggedIn,
                 onGogLoginClick = {
                     gogOAuthLauncher.launch(Intent(context, GOGOAuthActivity::class.java))
                 },
@@ -1406,6 +1408,16 @@ private fun LibraryScreenContent(
                 },
                 onAmazonLogoutClick = {
                     PlatformAuthUiHelpers.logoutAmazon(
+                        context = context,
+                        scope = lifecycleScope,
+                        callbacks = PlatformLogoutCallbacks(),
+                    )
+                },
+                onItchLoginClick = {
+                    itchCredentialsLauncher.launch(Intent(context, ItchAuthActivity::class.java))
+                },
+                onItchLogoutClick = {
+                    PlatformAuthUiHelpers.logoutItch(
                         context = context,
                         scope = lifecycleScope,
                         callbacks = PlatformLogoutCallbacks(),

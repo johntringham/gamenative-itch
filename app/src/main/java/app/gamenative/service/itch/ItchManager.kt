@@ -127,8 +127,10 @@ class ItchManager @Inject constructor(
         return Result.success(ownedKeys.size);
     }
 
-    fun deleteAllNonInstalledGames() {
-        TODO("Not yet implemented")
+    suspend fun deleteAllNonInstalledGames() {
+        withContext(Dispatchers.IO) {
+            itchGameDao.deleteAllNonInstalledGames()
+        }
     }
 
     suspend fun getGameFromDbById(gameId: Long): app.gamenative.data.ItchGame? {
