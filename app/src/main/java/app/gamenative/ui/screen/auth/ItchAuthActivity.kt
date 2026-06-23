@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import app.gamenative.R
@@ -49,8 +50,6 @@ class ItchAuthActivity : ComponentActivity() {
     companion object {
         const val EXTRA_AUTH_CODE = "auth_code"
         const val EXTRA_ERROR = "error"
-        private const val SAVED_OAUTH_STATE = "oauth_state"
-        private const val SAVED_AUTH_URL = "auth_url"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,6 +60,7 @@ class ItchAuthActivity : ComponentActivity() {
         }
     }
 
+    @Preview
     @Composable
     fun content(){
         val coroutineScope = rememberCoroutineScope()
