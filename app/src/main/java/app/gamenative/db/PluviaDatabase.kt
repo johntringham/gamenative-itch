@@ -97,6 +97,7 @@ const val DATABASE_NAME = "pluvia.db"
         AutoMigration(from = 22, to = 23), // Added local library play history table
         AutoMigration(from = 25, to = 26), // Added GOG hidden column
         AutoMigration(from = 27, to = 28), // Added is_vr_only, is_vr_supported to steam_app
+        AutoMigration(from = 28, to = 29), // Added itch_games table
     ]
 )
 @TypeConverters(

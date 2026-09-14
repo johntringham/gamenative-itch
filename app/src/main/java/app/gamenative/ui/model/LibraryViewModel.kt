@@ -1301,13 +1301,13 @@ class LibraryViewModel @Inject constructor(
                 if (includeGOG && !steamListFilterSelected) addAll(gogEntries)
                 if (includeEpic && !steamListFilterSelected) addAll(epicEntries)
                 if (includeAmazon && !steamListFilterSelected) addAll(amazonEntries)
+                if (includeItch && !steamListFilterSelected) addAll(itchEntries)
             }.let { entries ->
                 if (currentTab == app.gamenative.ui.enums.LibraryTab.FAVORITES) {
                     FavoritesUtils.filter(entries, favoriteIds) { it.item.appId }
                 } else {
                     entries
                 }
-                if (includeItch) addAll(itchEntries)
             }.sortedWith(sortComparator).mapIndexed { idx, entry ->
                 entry.item.copy(index = idx, isInstalled = entry.isInstalled)
             }
