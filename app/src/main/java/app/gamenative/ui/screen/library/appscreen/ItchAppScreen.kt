@@ -145,12 +145,6 @@ class ItchAppScreen : BaseAppScreen() {
             0L
         }
 
-        val gameNameForCompatibility = game?.title ?: libraryItem.name
-        val (compatibilityMessage, compatibilityColor) = rememberCompatibilityInfo(
-            context = context,
-            gameName = gameNameForCompatibility,
-        )
-
         val displayInfo = GameDisplayInfo(
             name = game?.title ?: libraryItem.name,
             iconUrl = game?.iconUrl ?: libraryItem.iconHash,
@@ -163,10 +157,7 @@ class ItchAppScreen : BaseAppScreen() {
             developer = game?.developer?.takeIf { it.isNotEmpty() } ?: "",
             installLocation = game?.installPath?.takeIf { it.isNotEmpty() },
             sizeOnDisk = sizeOnDisk,
-            sizeFromStore = sizeFromStore,
-            compatibilityMessage = compatibilityMessage,
-            compatibilityColor = compatibilityColor,
-        )
+            sizeFromStore = sizeFromStore)
         return displayInfo
     }
 

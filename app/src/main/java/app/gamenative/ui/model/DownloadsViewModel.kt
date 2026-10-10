@@ -22,6 +22,7 @@ import app.gamenative.service.epic.EpicConstants
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGConstants
 import app.gamenative.service.gog.GOGService
+import app.gamenative.service.itch.ItchConstants
 import app.gamenative.service.itch.ItchService
 import app.gamenative.ui.data.CancelConfirmation
 import app.gamenative.ui.data.DownloadItemState
@@ -745,6 +746,14 @@ class DownloadsViewModel @Inject constructor(
                 GameDownloadService.enqueueDownload(GameSource.AMAZON, item.appId, installPath = installPath)
             }
 
+            GameSource.ITCH -> {
+                val game = itchGameDao.getById(item.appId.toLong()) ?: return
+                val installPath = game.installPath.ifBlank {
+                    ItchConstants.getGameInstallPath(appContext, game.title)
+                }
+                GameDownloadService.enqueueDownload(GameSource.ITCH, item.appId, installPath = installPath)
+            }
+
             GameSource.CUSTOM_GAME -> Unit
         }
     }
@@ -754,7 +763,7 @@ class DownloadsViewModel @Inject constructor(
         if (resumable.isEmpty()) return
 
         viewModelScope.launch(Dispatchers.IO) {
-            // Queue every resumable download first (placeholders only — nothing is
+            // Queue every resumable download first (placeholders only ï¿½ nothing is
             // cancelled and the current download keeps running), then launch just the
             // first one: its registerDownload replaces the placeholder with the real
             // DownloadInfo and the queue drains the rest as each download finishes.
@@ -777,7 +786,7 @@ class DownloadsViewModel @Inject constructor(
         }
         viewModelScope.launch(Dispatchers.IO) {
             // Cancelling the active download advances the queue, so clear queued
-            // and paused entries FIRST — otherwise each cancel restarts the next
+            // and paused entries FIRST ï¿½ otherwise each cancel restarts the next
             // queued download just to cancel it again (chain of queue
             // transitions + snapshot writes = ANR).
             others.forEach { cancelOnStore(it.appId, it.gameSource, it.gameName) }
@@ -831,7 +840,7 @@ class DownloadsViewModel @Inject constructor(
             GameSource.STEAM -> {
                 val id = appId.toIntOrNull() ?: return
                 SteamService.getAppDownloadInfo(id)?.cancel()
-                // A queued (auto-paused) entry has no live job left to remove it —
+                // A queued (auto-paused) entry has no live job left to remove it ï¿½
                 // drop it explicitly (no-op when the job's completion already did).
                 SteamService.removeDownloadJob(id)
                 SteamService.deleteApp(id)

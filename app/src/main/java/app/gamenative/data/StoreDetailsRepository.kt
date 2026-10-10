@@ -54,6 +54,7 @@ object StoreDetailsRepository {
             GameSource.GOG -> gogLocaleForAppLocale(locale)
             GameSource.STEAM,
             GameSource.EPIC,
+            GameSource.ITCH,
             GameSource.AMAZON,
             -> SteamUtils.steamLanguageForAppLocale(locale)
             GameSource.CUSTOM_GAME -> "none"
@@ -91,6 +92,7 @@ object StoreDetailsRepository {
                     localeTag = localeKey,
                 )
                 GameSource.EPIC,
+                GameSource.ITCH,
                 GameSource.AMAZON,
                 -> fetchSteamSupplement(libraryItem.name, locale)
                 GameSource.CUSTOM_GAME -> StoreGameDetails()

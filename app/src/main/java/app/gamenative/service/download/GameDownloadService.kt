@@ -31,6 +31,7 @@ import app.gamenative.data.GameSource
 import app.gamenative.service.amazon.AmazonService
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
+import app.gamenative.service.itch.ItchService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -833,7 +834,7 @@ object GameDownloadService {
      * Resume next pending download. The claim (queue head -> current) is atomic under
      * [queueLock]; the store startup itself runs unlocked on the caller's coroutine.
      */
-    private fun resumeNextDownload(context: Context) {
+    private suspend fun resumeNextDownload(context: Context) {
         // The queue relaunches with the bare application context, which follows the OS locale;
         // wrap it so store managers resolve status strings in the app's configured language.
         val context = LocaleHelper.applyLanguage(context, app.gamenative.PrefManager.appLanguage)
@@ -867,6 +868,12 @@ object GameDownloadService {
                     context = context,
                     appId = nextEntry.gameId.toInt(),
                     dlcGameIds = nextEntry.dlcGameIds,
+                    installPath = nextEntry.installPath!!,
+                    containerLanguage = nextEntry.containerLanguage!!
+                )
+                GameSource.ITCH -> ItchService.downloadGame(
+                    gameId = nextEntry.gameId.toLong(),
+                    context = context,
                     installPath = nextEntry.installPath!!,
                     containerLanguage = nextEntry.containerLanguage!!
                 )
