@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 29,
-    "identityHash": "d4c8e6b791dd3a116ae40bca10b421f7",
+    "identityHash": "012a8c5efda8af7bcdd2e835d7760d77",
     "entities": [
       {
         "tableName": "app_info",
@@ -1300,6 +1300,115 @@
         ]
       },
       {
+        "tableName": "itch_games",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `title` TEXT NOT NULL, `downloadKey` INTEGER NOT NULL, `download_size` INTEGER NOT NULL, `install_size` INTEGER NOT NULL, `is_installed` INTEGER NOT NULL, `install_path` TEXT NOT NULL, `image_url` TEXT NOT NULL, `icon_url` TEXT NOT NULL, `description` TEXT NOT NULL, `release_date` TEXT NOT NULL, `developer` TEXT NOT NULL, `last_played` INTEGER NOT NULL, `play_time` INTEGER NOT NULL, `type` INTEGER NOT NULL, `exclude` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "downloadKey",
+            "columnName": "downloadKey",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "downloadSize",
+            "columnName": "download_size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "installSize",
+            "columnName": "install_size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isInstalled",
+            "columnName": "is_installed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "installPath",
+            "columnName": "install_path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "imageUrl",
+            "columnName": "image_url",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "iconUrl",
+            "columnName": "icon_url",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "releaseDate",
+            "columnName": "release_date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "developer",
+            "columnName": "developer",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastPlayed",
+            "columnName": "last_played",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "playTime",
+            "columnName": "play_time",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exclude",
+            "columnName": "exclude",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
         "tableName": "downloading_app_info",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`appId` INTEGER NOT NULL, `dlcAppIds` TEXT NOT NULL, `branch` TEXT NOT NULL DEFAULT 'public', PRIMARY KEY(`appId`))",
         "fields": [
@@ -1902,7 +2011,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd4c8e6b791dd3a116ae40bca10b421f7')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '012a8c5efda8af7bcdd2e835d7760d77')"
     ]
   }
 }
