@@ -92,6 +92,8 @@ import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
 import app.gamenative.api.AccountApi
 import app.gamenative.api.DebugReportApi
+import app.gamenative.service.itch.ItchAuthManager
+import app.gamenative.service.itch.ItchService
 import app.gamenative.api.SupportApi
 import app.gamenative.ui.component.dialog.AI_HELP_PATH_APP
 import app.gamenative.ui.component.dialog.AccountSignInDialog
@@ -240,6 +242,10 @@ private fun resolveGameAppId(context: Context, appId: String): GameResolutionRes
 
         GameSource.AMAZON -> {
             AmazonService.isGameInstalledByAppId(context, gameId)
+        }
+
+        GameSource.ITCH -> {
+            ItchService.isGameInstalled(gameId.toLong())
         }
 
         GameSource.CUSTOM_GAME -> {
@@ -923,6 +929,16 @@ fun PluviaMain(
             ) {
                 Timber.d("[PluviaMain]: Starting AmazonService for logged-in user")
                 AmazonService.start(context)
+            }
+
+            // Start ItchService if user has Itch
+            if (ItchAuthManager.hasStoredCredentials(context) &&
+                !ItchService.isRunning
+            ) {
+                Timber.tag("itch").d("[PluviaMain]: Starting ItchService for logged-in user")
+                ItchService.start(context)
+            } else {
+                Timber.tag("itch").d("Itch SERVICE Not going to start: ${ItchService.isRunning}")
             }
 
             // Handle navigation when already logged in (e.g., app resumed with active session)
@@ -2364,6 +2380,7 @@ fun preLaunchApp(
                 GameSource.EPIC -> EpicService.getLaunchExecutable(appId)
                 GameSource.CUSTOM_GAME -> CustomGameScanner.getLaunchExecutable(container)
                 GameSource.AMAZON -> AmazonService.getLaunchExecutable(appId)
+                GameSource.ITCH -> ItchService.getLaunchExecutable(appId, container)
             }
             if (effectiveExe.isBlank()) {
                 Timber.tag("preLaunchApp").w("Cannot launch $appId: no executable found (game source: $gameSource)")
@@ -2796,11 +2813,13 @@ fun preLaunchApp(
             return@launch
         }
 
-        if (skipCloudSync || isLocalSavesOnly) {
+        if (skipCloudSync || isLocalSavesOnly || gameSource == GameSource.ITCH) {
             if (isLocalSavesOnly) {
                 Timber.tag("preLaunchApp").i("Local saves only enabled for $appId — skipping Steam Cloud sync")
-            } else {
+            } else if(skipCloudSync) {
                 Timber.tag("preLaunchApp").w("Skipping Steam Cloud sync for $appId by user request")
+            }else if(gameSource == GameSource.ITCH){
+                Timber.tag("preLaunchApp").w("Itch doesn't support cloud saves, skipping sync for $appId")
             }
             setLoadingDialogVisible(false)
             onSuccess(context, appId)
@@ -3292,3 +3311,4 @@ fun preLaunchApp(
         }
     }
 }
+

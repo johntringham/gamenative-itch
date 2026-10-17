@@ -53,6 +53,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import app.gamenative.ui.icons.Itch
 
 /**
  * Library app item that displays a game in either list or grid view.
@@ -177,6 +178,7 @@ fun GameSourceIcon(
             GameSource.GOG -> Icon(painter = painterResource(R.drawable.ic_gog), contentDescription = "Gog", modifier = Modifier.size(iconSize.dp).alpha(0.7f))
             GameSource.EPIC -> Icon(painter = painterResource(R.drawable.ic_epic), contentDescription = "Epic", modifier = Modifier.size(iconSize.dp).alpha(0.7f))
             GameSource.AMAZON -> Icon(imageVector = Icons.Filled.Amazon, contentDescription = "Amazon", modifier = Modifier.size(iconSize.dp).alpha(0.7f))
+            GameSource.ITCH -> Icon(imageVector = Icons.Filled.Itch, contentDescription = "Itch", modifier = Modifier.size(iconSize.dp).alpha(0.7f))
         }
     }
 }

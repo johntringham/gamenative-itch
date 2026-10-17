@@ -14,6 +14,7 @@ enum class LibraryTab(
     val showGoG: Boolean,
     val showEpic: Boolean,
     val showAmazon: Boolean,
+    val showItch: Boolean,
     val installedOnly: Boolean,
     val icon: ImageVector? = null,
 ) {
@@ -24,6 +25,7 @@ enum class LibraryTab(
         showGoG = false,
         showEpic = false,
         showAmazon = false,
+        showItch = false,
         installedOnly = false,
         icon = Icons.Outlined.Explore,
     ),
@@ -34,6 +36,7 @@ enum class LibraryTab(
         showGoG = true,
         showEpic = true,
         showAmazon = true,
+        showItch = true,
         installedOnly = false,
     ),
     FAVORITES(
@@ -43,6 +46,7 @@ enum class LibraryTab(
         showGoG = true,
         showEpic = true,
         showAmazon = true,
+        showItch = true,
         installedOnly = false,
         icon = Icons.Rounded.Star,
     ),
@@ -53,6 +57,7 @@ enum class LibraryTab(
         showGoG = false,
         showEpic = false,
         showAmazon = false,
+        showItch = false,
         installedOnly = false,
     ),
     GOG(
@@ -62,6 +67,7 @@ enum class LibraryTab(
         showGoG = true,
         showEpic = false,
         showAmazon = false,
+        showItch = false,
         installedOnly = false,
     ),
     EPIC(
@@ -71,6 +77,7 @@ enum class LibraryTab(
         showGoG = false,
         showEpic = true,
         showAmazon = false,
+        showItch = false,
         installedOnly = false,
     ),
     AMAZON(
@@ -80,6 +87,17 @@ enum class LibraryTab(
         showGoG = false,
         showEpic = false,
         showAmazon = true,
+        showItch = false,
+        installedOnly = false,
+    ),
+    ITCH(
+        labelResId =R.string.tab_itch,
+        showCustom = false,
+        showSteam = false,
+        showGoG = false,
+        showEpic = false,
+        showAmazon = false,
+        showItch = true,
         installedOnly = false,
     ),
     LOCAL(
@@ -89,6 +107,7 @@ enum class LibraryTab(
         showGoG = false,
         showEpic = false,
         showAmazon = false,
+        showItch = false,
         installedOnly = false,
     ),
     ;

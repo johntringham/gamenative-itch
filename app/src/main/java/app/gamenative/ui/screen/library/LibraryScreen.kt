@@ -18,9 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
@@ -30,7 +28,6 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -96,7 +93,6 @@ import app.gamenative.ui.enums.PaneType
 import app.gamenative.ui.enums.SortOption
 import app.gamenative.ui.internal.fakeAppInfo
 import app.gamenative.ui.model.LibraryViewModel
-import app.gamenative.service.SteamService
 import app.gamenative.ui.screen.library.components.LibraryCarouselPane
 import app.gamenative.ui.screen.library.components.LibraryDetailPane
 import app.gamenative.ui.screen.library.components.LibraryListPane
@@ -123,6 +119,8 @@ import app.gamenative.utils.SteamUtils
 import com.posthog.PostHog
 import kotlinx.coroutines.launch
 import android.os.SystemClock
+import app.gamenative.service.itch.ItchAuthManager
+import app.gamenative.ui.screen.auth.ItchAuthActivity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -325,6 +323,41 @@ private fun LibraryScreenContent(
                 },
                 onSuccess = {
                     SnackbarManager.show(context.getString(R.string.amazon_login_success_title))
+                },
+                onDialogClose = { },
+            )
+        }
+    }
+
+    val itchCredentialsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode != android.app.Activity.RESULT_OK) {
+            val message = result.data?.getStringExtra(ItchAuthActivity.EXTRA_ERROR)
+                ?: context.getString(R.string.gog_login_cancel)
+            SnackbarManager.show(message)
+            return@rememberLauncherForActivityResult
+        }
+        val code = result.data?.getStringExtra(ItchAuthActivity.EXTRA_AUTH_CODE)
+        if (code == null) {
+            val message = result.data?.getStringExtra(ItchAuthActivity.EXTRA_ERROR)
+                ?: context.getString(R.string.itch_login_cancel)
+            SnackbarManager.show(message)
+            return@rememberLauncherForActivityResult
+        }
+        lifecycleScope.launch {
+            PlatformOAuthHandlers.handleItchAuthentication(
+                context = context,
+                apiKey = code,
+                coroutineScope = lifecycleScope,
+                onLoadingChange = { },
+                onError = { msg ->
+                    if (msg != null) {
+                        SnackbarManager.show(msg)
+                    }
+                },
+                onSuccess = {
+                    SnackbarManager.show(context.getString(R.string.gog_login_success_title))
                 },
                 onDialogClose = { },
             )
@@ -1030,6 +1063,7 @@ private fun LibraryScreenContent(
                     LibraryTab.GOG -> !GOGService.hasStoredCredentials(context)
                     LibraryTab.EPIC -> !EpicService.hasStoredCredentials(context)
                     LibraryTab.AMAZON -> !AmazonService.hasStoredCredentials(context)
+                    LibraryTab.ITCH -> !ItchAuthManager.hasStoredCredentials(context)
                     LibraryTab.LOCAL -> PrefManager.customGamesCount == 0
                     else -> false
                 }
@@ -1059,6 +1093,11 @@ private fun LibraryScreenContent(
                             R.string.library_source_not_logged_in_amazon,
                             R.string.amazon_settings_login_title,
                             { amazonOAuthLauncher.launch(Intent(context, AmazonOAuthActivity::class.java)) },
+                        )
+                        LibraryTab.ITCH -> Triple(
+                            R.string.library_source_not_logged_in_itch,
+                            R.string.itch_settings_login_title,
+                            { itchCredentialsLauncher.launch(Intent(context, ItchAuthActivity::class.java)) },
                         )
                         LibraryTab.LOCAL -> Triple(
                             R.string.library_source_no_custom_games,
@@ -1176,6 +1215,7 @@ private fun LibraryScreenContent(
                             LibraryTab.GOG to state.gogCount,
                             LibraryTab.EPIC to state.epicCount,
                             LibraryTab.AMAZON to state.amazonCount,
+                            LibraryTab.ITCH to state.itchCount,
                             LibraryTab.LOCAL to state.localCount,
                         ),
                         onTabSelected = onTabChanged,
@@ -1329,6 +1369,7 @@ private fun LibraryScreenContent(
             val gogLoggedIn = app.gamenative.service.gog.GOGAuthManager.hasStoredCredentials(context)
             val epicLoggedIn = app.gamenative.service.epic.EpicAuthManager.hasStoredCredentials(context)
             val amazonLoggedIn = app.gamenative.service.amazon.AmazonAuthManager.hasStoredCredentials(context)
+            val itchLoggedIn = app.gamenative.service.itch.ItchAuthManager.hasStoredCredentials(context)
 
             SystemMenu(
                 isOpen = isSystemMenuOpen,
@@ -1341,6 +1382,7 @@ private fun LibraryScreenContent(
                 gogLoggedIn = gogLoggedIn,
                 epicLoggedIn = epicLoggedIn,
                 amazonLoggedIn = amazonLoggedIn,
+                itchLoggedIn = itchLoggedIn,
                 onGogLoginClick = {
                     gogOAuthLauncher.launch(Intent(context, GOGOAuthActivity::class.java))
                 },
@@ -1366,6 +1408,16 @@ private fun LibraryScreenContent(
                 },
                 onAmazonLogoutClick = {
                     PlatformAuthUiHelpers.logoutAmazon(
+                        context = context,
+                        scope = lifecycleScope,
+                        callbacks = PlatformLogoutCallbacks(),
+                    )
+                },
+                onItchLoginClick = {
+                    itchCredentialsLauncher.launch(Intent(context, ItchAuthActivity::class.java))
+                },
+                onItchLogoutClick = {
+                    PlatformAuthUiHelpers.logoutItch(
                         context = context,
                         scope = lifecycleScope,
                         callbacks = PlatformLogoutCallbacks(),

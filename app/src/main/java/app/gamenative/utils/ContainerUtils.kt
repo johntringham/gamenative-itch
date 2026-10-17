@@ -12,6 +12,9 @@ import app.gamenative.service.SteamService
 import app.gamenative.service.amazon.AmazonService
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
+import app.gamenative.service.itch.ItchService
+import app.gamenative.utils.BestConfigService
+import app.gamenative.utils.CustomGameScanner
 import com.winlator.container.Container
 import com.winlator.container.ContainerData
 import com.winlator.container.ContainerManager
@@ -793,6 +796,24 @@ object ContainerUtils {
                     defaultDrives
                 }
             }
+
+            GameSource.ITCH -> {
+                // For itch games, map the specific game directory to A: drive
+                val gameId = extractGameIdFromContainerId(appId)
+                val game = ItchService.getItchGameOf(gameId.toLong())
+                if (game != null && game.installPath.isNotEmpty()) {
+                    val gameInstallPath = game.installPath
+                    val drive: Char = if (defaultDrives.contains("A:")) {
+                        Container.getNextAvailableDriveLetter(defaultDrives)
+                    } else {
+                        'A'
+                    }
+                    "$defaultDrives$drive:$gameInstallPath"
+                } else {
+                    Timber.w("Could not find itch game info for: $gameId, using default drives")
+                    defaultDrives
+                }
+            }
         }
         Timber.d("Prepared container drives: $drives")
 
@@ -1095,6 +1116,11 @@ object ContainerUtils {
                 val appIdInt = runCatching { extractGameIdFromContainerId(appId) }.getOrNull()
                 if (appIdInt != null) AmazonService.getInstallPathByAppId(appIdInt) else null
             }
+
+            GameSource.ITCH -> {
+                val gameId = extractGameIdFromContainerId(appId)
+                ItchService.getInstallPath(gameId.toLong())
+            }
         }
 
         val resolvedGameFolderPath = if (gameSource == GameSource.CUSTOM_GAME) {
@@ -1270,6 +1296,7 @@ object ContainerUtils {
             containerId.startsWith("GOG_") -> GameSource.GOG
             containerId.startsWith("EPIC_") -> GameSource.EPIC
             containerId.startsWith("AMAZON_") -> GameSource.AMAZON
+            containerId.startsWith("ITCH_") -> GameSource.ITCH
             // Add other platforms here..
             else -> GameSource.STEAM // default fallback
         }
@@ -1286,6 +1313,7 @@ object ContainerUtils {
         GameSource.GOG,
         GameSource.EPIC,
         GameSource.AMAZON,
+        GameSource.ITCH,
         GameSource.CUSTOM_GAME,
         -> true
     }
@@ -1302,6 +1330,8 @@ object ContainerUtils {
             GameSource.GOG -> GOGService.getGOGGameOf(gameId.toString())?.title
             GameSource.EPIC -> EpicService.getEpicGameOf(gameId)?.title
             GameSource.AMAZON -> AmazonService.getAmazonGameByAppId(gameId)?.title
+            GameSource.ITCH -> ItchService.getItchGameOf(gameId.toLong())?.title
+
             GameSource.CUSTOM_GAME -> {
                 val customAppId = "${GameSource.CUSTOM_GAME.name}_$gameId"
                 CustomGameScanner.getFolderPathFromAppId(customAppId)

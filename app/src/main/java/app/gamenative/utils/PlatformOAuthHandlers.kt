@@ -4,9 +4,9 @@ import android.content.Context
 import app.gamenative.service.amazon.AmazonService
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
+import app.gamenative.service.itch.ItchAuthManager
+import app.gamenative.service.itch.ItchService
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 object PlatformOAuthHandlers {
@@ -114,6 +114,42 @@ object PlatformOAuthHandlers {
             }
         } catch (e: Exception) {
             Timber.e(e, "[PlatformOAuth]: Amazon authentication exception: ${e.message}")
+            onLoadingChange(false)
+            onError(e.message ?: "Authentication failed")
+        }
+    }
+
+    suspend fun handleItchAuthentication(
+        context: Context,
+        apiKey: String,
+        coroutineScope: CoroutineScope,
+        onLoadingChange: (Boolean) -> Unit,
+        onError: (String?) -> Unit,
+        onSuccess: (Int) -> Unit,
+        onDialogClose: () -> Unit,
+    ) {
+        onLoadingChange(true)
+        onError(null)
+
+        try {
+            Timber.d("[PlatformOAuth]: Starting itch authentication...")
+            val result = ItchAuthManager.authenticateWithApiKey(context, apiKey)
+
+            if (result.isSuccess) {
+                Timber.i("[PlatformOAuth]: itch authentication successful!")
+                ItchService.start(context)
+                ItchService.triggerLibrarySync(context)
+                onSuccess(0)
+                onLoadingChange(false)
+                onDialogClose()
+            } else {
+                val error = result.exceptionOrNull()?.message ?: "Authentication failed"
+                Timber.e("[PlatformOAuth]: itch authentication failed: $error")
+                onLoadingChange(false)
+                onError(error)
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "[PlatformOAuth]: itch authentication exception: ${e.message}")
             onLoadingChange(false)
             onError(e.message ?: "Authentication failed")
         }

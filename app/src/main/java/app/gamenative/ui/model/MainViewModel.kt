@@ -27,6 +27,7 @@ import app.gamenative.service.amazon.AmazonService
 import app.gamenative.service.epic.EpicCloudSavesManager
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
+import app.gamenative.service.itch.ItchService
 import app.gamenative.utils.BootAdView
 import app.gamenative.utils.ConversionTracker
 import app.gamenative.utils.CustomGameScanner
@@ -637,6 +638,10 @@ class MainViewModel @Inject constructor(
                     GameSource.AMAZON -> {
                         val game = AmazonService.getAmazonGameByAppId(gameId)
                         game?.heroUrl?.ifEmpty { game.artUrl } ?: ""
+                    }
+                    GameSource.ITCH -> {
+                        val game = ItchService.getItchGameOf(gameId.toLong())
+                        game?.iconUrl?.ifEmpty { game.imageUrl } ?: ""
                     }
                     GameSource.CUSTOM_GAME -> {
                         val folderPath = CustomGameScanner.getFolderPathFromAppId(appId) ?: return@withContext ""

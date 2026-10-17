@@ -10,6 +10,7 @@ import app.gamenative.service.SteamService
 import app.gamenative.service.amazon.AmazonService
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
+import app.gamenative.service.itch.ItchService
 import com.winlator.core.GPUInformation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -64,6 +65,10 @@ object GameFeedbackUtils {
                 GameSource.STEAM -> {
                     val appInfo = SteamService.getAppInfoOf(gameId)
                     appInfo?.name ?: ""
+                }
+                GameSource.ITCH -> {
+                    val game = ItchService.getItchGameOf(gameId.toLong())
+                    game?.title ?: ""
                 }
             }
 

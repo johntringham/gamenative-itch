@@ -11,6 +11,7 @@ import app.gamenative.data.LibraryItem
 import app.gamenative.db.dao.AmazonGameDao
 import app.gamenative.db.dao.EpicGameDao
 import app.gamenative.db.dao.GOGGameDao
+import app.gamenative.db.dao.ItchGameDao
 import app.gamenative.db.dao.SteamAppDao
 import app.gamenative.events.AndroidEvent
 import app.gamenative.service.SteamService
@@ -21,6 +22,8 @@ import app.gamenative.service.epic.EpicConstants
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGConstants
 import app.gamenative.service.gog.GOGService
+import app.gamenative.service.itch.ItchConstants
+import app.gamenative.service.itch.ItchService
 import app.gamenative.ui.data.CancelConfirmation
 import app.gamenative.ui.data.DownloadItemState
 import app.gamenative.ui.data.DownloadItemStatus
@@ -51,6 +54,7 @@ class DownloadsViewModel @Inject constructor(
     private val epicGameDao: EpicGameDao,
     private val gogGameDao: GOGGameDao,
     private val amazonGameDao: AmazonGameDao,
+    private val itchGameDao: ItchGameDao
 ) : ViewModel() {
 
     private data class ActiveDownloadBinding(
@@ -276,6 +280,23 @@ class DownloadsViewModel @Inject constructor(
                 }
             }
 
+            GameSource.ITCH -> {
+                val id = appId.toLongOrNull() ?: -1;
+                val game = itchGameDao.getById(id)
+                game?.let {
+                    val libraryItem = LibraryItem(
+                        appId = "${GameSource.ITCH.name}_${it.id}",
+                        name = it.title,
+                        iconHash = it.iconUrl,
+                        capsuleImageUrl = it.iconUrl,
+                        headerImageUrl = it.iconUrl,
+                        heroImageUrl = it.iconUrl,
+                        gameSource = GameSource.ITCH,
+                    )
+                    libraryItem
+                }
+            }
+
             GameSource.CUSTOM_GAME -> {
                 CustomGameScanner.scanAsLibraryItems(query = "")
                     .firstOrNull { it.appId == libraryAppId }
@@ -365,6 +386,7 @@ class DownloadsViewModel @Inject constructor(
             GameSource.EPIC -> appId.toIntOrNull()?.let { epicGameDao.getById(it)?.isInstalled == true } ?: false
             GameSource.GOG -> gogGameDao.getById(appId)?.isInstalled == true
             GameSource.AMAZON -> amazonGameDao.getByProductId(appId)?.isInstalled == true
+            GameSource.ITCH -> appId.toLongOrNull()?.let{ itchGameDao.getById(it)?.isInstalled } ?: false
             GameSource.CUSTOM_GAME -> false
         }
     }
@@ -608,6 +630,7 @@ class DownloadsViewModel @Inject constructor(
 
             GameSource.GOG -> GOGService.cancelDownload(item.appId)
             GameSource.AMAZON -> AmazonService.cancelDownload(item.appId)
+                GameSource.ITCH -> ItchService.cancelDownload(item.appId.toLong())
             GameSource.CUSTOM_GAME -> Unit
         }
     }
@@ -665,6 +688,16 @@ class DownloadsViewModel @Inject constructor(
                 result.exceptionOrNull()?.message?.let { recentFailureMessages[key] = it }
             }
 
+                GameSource.ITCH -> {
+                    // todo
+//                    val game = gogGameDao.getById(item.appId) ?: return@launch
+//                    val installPath = game.installPath.ifBlank { GOGConstants.getGameInstallPath(game.title) }
+//                    val container = ContainerUtils.getOrCreateContainer(appContext, "${GameSource.GOG.name}_${item.appId}")
+//                    val language = ContainerUtils.toContainerData(container).language
+//                    val result = GOGService.downloadGame(appContext, item.appId, installPath, language)
+//                    result.exceptionOrNull()?.message?.let { recentFailureMessages[key] = it }
+                }
+
             GameSource.CUSTOM_GAME -> Unit
         }
     }
@@ -713,6 +746,14 @@ class DownloadsViewModel @Inject constructor(
                 GameDownloadService.enqueueDownload(GameSource.AMAZON, item.appId, installPath = installPath)
             }
 
+            GameSource.ITCH -> {
+                val game = itchGameDao.getById(item.appId.toLong()) ?: return
+                val installPath = game.installPath.ifBlank {
+                    ItchConstants.getGameInstallPath(appContext, game.title)
+                }
+                GameDownloadService.enqueueDownload(GameSource.ITCH, item.appId, installPath = installPath)
+            }
+
             GameSource.CUSTOM_GAME -> Unit
         }
     }
@@ -722,7 +763,7 @@ class DownloadsViewModel @Inject constructor(
         if (resumable.isEmpty()) return
 
         viewModelScope.launch(Dispatchers.IO) {
-            // Queue every resumable download first (placeholders only — nothing is
+            // Queue every resumable download first (placeholders only � nothing is
             // cancelled and the current download keeps running), then launch just the
             // first one: its registerDownload replaces the placeholder with the real
             // DownloadInfo and the queue drains the rest as each download finishes.
@@ -745,7 +786,7 @@ class DownloadsViewModel @Inject constructor(
         }
         viewModelScope.launch(Dispatchers.IO) {
             // Cancelling the active download advances the queue, so clear queued
-            // and paused entries FIRST — otherwise each cancel restarts the next
+            // and paused entries FIRST � otherwise each cancel restarts the next
             // queued download just to cancel it again (chain of queue
             // transitions + snapshot writes = ANR).
             others.forEach { cancelOnStore(it.appId, it.gameSource, it.gameName) }
@@ -799,7 +840,7 @@ class DownloadsViewModel @Inject constructor(
             GameSource.STEAM -> {
                 val id = appId.toIntOrNull() ?: return
                 SteamService.getAppDownloadInfo(id)?.cancel()
-                // A queued (auto-paused) entry has no live job left to remove it —
+                // A queued (auto-paused) entry has no live job left to remove it �
                 // drop it explicitly (no-op when the job's completion already did).
                 SteamService.removeDownloadJob(id)
                 SteamService.deleteApp(id)
@@ -835,6 +876,24 @@ class DownloadsViewModel @Inject constructor(
                 AmazonService.deleteGame(appContext, appId)
                 scheduleRefreshDownloads()
             }
+
+                GameSource.ITCH -> {
+                    // todo
+//                    val id = appId.toLongOrNull() ?: -1;
+//                    ItchService.cancelDownload(appId)
+//                    val game = itchGameDao.getById(id)
+//                    if (game != null) {
+//                        GOGService.deleteGame(
+//                            appContext,
+//                            LibraryItem(
+//                                appId = appId,
+//                                name = game.title.ifBlank { gameName },
+//                                gameSource = GameSource.GOG,
+//                            ),
+//                        )
+//                    }
+//                    scheduleRefreshDownloads()
+                }
 
             GameSource.CUSTOM_GAME -> Unit
         }

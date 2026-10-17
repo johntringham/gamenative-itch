@@ -32,6 +32,7 @@ import app.gamenative.data.GOGGame
 import app.gamenative.data.EpicGame
 import app.gamenative.data.AmazonGame
 import app.gamenative.db.dao.LibraryPlayHistoryDao
+import app.gamenative.data.ItchGame
 import app.gamenative.db.dao.SteamAppDao
 import app.gamenative.db.dao.GOGGameDao
 import app.gamenative.db.dao.EpicGameDao
@@ -60,6 +61,8 @@ import app.gamenative.data.RecommendationRepository
 import app.gamenative.data.RecommendedGame
 import app.gamenative.utils.DeviceGameStatsCache
 import app.gamenative.utils.GpuGameStatsCache
+import app.gamenative.db.dao.ItchGameDao
+import app.gamenative.service.itch.ItchService
 import app.gamenative.utils.GameCompatibilityCache
 import app.gamenative.utils.GameCompatibilityService
 import app.gamenative.utils.HardwareUtils
@@ -100,6 +103,7 @@ class LibraryViewModel @Inject constructor(
     private val gogGameDao: GOGGameDao,
     private val epicGameDao: EpicGameDao,
     private val amazonGameDao: AmazonGameDao,
+    private val itchGameDao: ItchGameDao,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -166,6 +170,7 @@ class LibraryViewModel @Inject constructor(
     private var amazonGameList: List<AmazonGame> = emptyList()
     private var playHistoryByAppId: Map<String, Long> = emptyMap()
 
+    private var itchGameList: List<ItchGame> = emptyList()
     @Volatile private var steamCollections: List<SteamCollection>? = null
 
     // Mirrors PrefManager.showHiddenGamesByDefault without the async DataStore write race.
@@ -310,6 +315,17 @@ class LibraryViewModel @Inject constructor(
                 Timber.tag("LibraryViewModel").d("Collecting ${games.size} Amazon games")
                 val hasChanges = amazonGameList.size != games.size || amazonGameList != games
                 amazonGameList = games
+                if (hasChanges) {
+                    onFilterApps(paginationCurrentPage)
+                }
+            }
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            itchGameDao.getAll().collect { games ->
+                Timber.tag("LibraryViewModel").d("Collecting ${games.size} itch games")
+                val hasChanges = itchGameList.size != games.size || itchGameList != games
+                itchGameList = games
                 if (hasChanges) {
                     onFilterApps(paginationCurrentPage)
                 }
@@ -485,6 +501,11 @@ class LibraryViewModel @Inject constructor(
                 PrefManager.showAmazonInLibrary = newValue
                 _state.update { it.copy(showAmazonInLibrary = newValue) }
             }
+            GameSource.ITCH -> {
+                val newValue = !current.showItchInLibrary
+                PrefManager.showItchInLibrary = newValue
+                _state.update { it.copy(showItchInLibrary = newValue) }
+            }
         }
         onFilterApps(paginationCurrentPage)
     }
@@ -646,6 +667,10 @@ class LibraryViewModel @Inject constructor(
                 if (AmazonService.hasStoredCredentials(context)) {
                     Timber.tag("LibraryViewModel").i("Triggering Amazon library refresh")
                     AmazonService.triggerLibrarySync(context)
+                }
+                if (ItchService.hasStoredCredentials(context)) {
+                    Timber.tag("LibraryViewModel").i("Triggering Itch library refresh")
+                    ItchService.triggerLibrarySync(context)
                 }
             } catch (e: Exception) {
                 Timber.tag("LibraryViewModel").e(e, "Failed to refresh owned games from server")
@@ -1107,10 +1132,53 @@ class LibraryViewModel @Inject constructor(
                     )
                 }
 
+            // Filter itch games
+            val filteredItchGames = itchGameList
+                .asSequence()
+                .filter { game ->
+                    if (currentState.searchQuery.isNotEmpty()) {
+                        matches(game.title, currentState.searchQuery)
+                    } else {
+                        true
+                    }
+                }
+                .filter { game ->
+                    val installedOnly = currentState.currentTab.installedOnly ||
+                            currentState.appInfoSortType.contains(AppFilter.INSTALLED)
+                    if (installedOnly) {
+                        game.isInstalled
+                    } else {
+                        true
+                    }
+                }
+                .toList()
+
+            val itchEntries = filteredItchGames
+                .filter { passesCompatibleFilter(it.title) }
+                .map { game ->
+                    LibraryEntry(
+                        item = LibraryItem(
+                            index = 0,
+                            appId = "${GameSource.ITCH.name}_${game.id}",
+                            name = game.title,
+                            iconHash = game.iconUrl.ifEmpty { game.imageUrl },
+                            capsuleImageUrl = game.iconUrl.ifEmpty { game.imageUrl },
+                            headerImageUrl = game.imageUrl.ifEmpty { game.iconUrl },
+                            heroImageUrl = game.imageUrl.ifEmpty { game.iconUrl },
+                            isShared = false,
+                            gameSource = GameSource.ITCH,
+                        ),
+                        isInstalled = game.isInstalled,
+                    )
+                }
+
+
             // Calculate installed counts
             val gogInstalledCount = filteredGOGGames.count { it.isInstalled }
             val epicInstalledCount = filteredEpicGames.count { it.isInstalled }
             val amazonInstalledCount = filteredAmazonGames.count { it.isInstalled }
+            val itchInstalledCount = filteredItchGames.count { it.isInstalled }
+
             // Save game counts for skeleton loaders (only when not searching, to get accurate counts)
             // This needs to happen before filtering by source, so we save the total counts
             if (currentState.searchQuery.isEmpty()) {
@@ -1160,6 +1228,12 @@ class LibraryViewModel @Inject constructor(
             } else {
                 currentTab.showAmazon
             }) && AmazonService.hasStoredCredentials(context)
+
+            val includeItch = (if (currentTab == app.gamenative.ui.enums.LibraryTab.ALL) {
+                currentState.showItchInLibrary
+            } else {
+                currentTab.showItch
+            }) && ItchService.hasStoredCredentials(context)
 
             // Combine both lists and apply sort option
             val sortComparator: Comparator<LibraryEntry> = when (currentState.currentSortOption) {
@@ -1227,6 +1301,7 @@ class LibraryViewModel @Inject constructor(
                 if (includeGOG && !steamListFilterSelected) addAll(gogEntries)
                 if (includeEpic && !steamListFilterSelected) addAll(epicEntries)
                 if (includeAmazon && !steamListFilterSelected) addAll(amazonEntries)
+                if (includeItch && !steamListFilterSelected) addAll(itchEntries)
             }.let { entries ->
                 if (currentTab == app.gamenative.ui.enums.LibraryTab.FAVORITES) {
                     FavoritesUtils.filter(entries, favoriteIds) { it.item.appId }
@@ -1474,3 +1549,4 @@ class LibraryViewModel @Inject constructor(
         response: GameCompatibilityService.GameCompatibilityResponse,
     ): GameCompatibilityStatus = GameCompatibilityService.statusFor(response)
 }
+
